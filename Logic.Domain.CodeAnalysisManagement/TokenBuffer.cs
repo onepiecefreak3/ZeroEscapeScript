@@ -1,0 +1,24 @@
+﻿using Logic.Domain.CodeAnalysisManagement.Contract;
+
+namespace Logic.Domain.CodeAnalysisManagement;
+
+internal class TokenBuffer<TToken> : Buffer<TToken>
+    where TToken : struct
+{
+    private readonly ILexer<TToken> _lexer;
+
+    public override bool IsEndOfInput { get; protected set; }
+
+    public TokenBuffer(ILexer<TToken> lexer)
+    {
+        _lexer = lexer;
+    }
+
+    protected override TToken ReadInternal()
+    {
+        TToken value = _lexer.Read();
+        IsEndOfInput = _lexer.IsEndOfInput;
+
+        return value;
+    }
+}

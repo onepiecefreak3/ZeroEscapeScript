@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+	<RootNamespace>Logic.Business.SpikeChunsoftScriptManagement</RootNamespace>
+	<AssemblyName>Logic.Business.SpikeChunsoftScriptManagement</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrossCutting.Core.Contract\CrossCutting.Core.Contract.csproj" />
+    <ProjectReference Include="..\Logic.Business.SpikeChunsoftScriptManagement.Contract\Logic.Business.SpikeChunsoftScriptManagement.Contract.csproj" />
+    <ProjectReference Include="..\Logic.Domain.CodeAnalysisManagement.Contract\Logic.Domain.CodeAnalysisManagement.Contract.csproj" />
+    <ProjectReference Include="..\Logic.Domain.SpikeChunsoftManagement.Contract\Logic.Domain.SpikeChunsoftManagement.Contract.csproj" />
+  </ItemGroup>
+
+</Project>

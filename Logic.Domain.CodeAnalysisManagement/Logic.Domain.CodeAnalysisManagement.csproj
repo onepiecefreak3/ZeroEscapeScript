@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+	<RootNamespace>Logic.Domain.CodeAnalysisManagement</RootNamespace>
+	<AssemblyName>Logic.Domain.CodeAnalysisManagement</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrossCutting.Core.Contract\CrossCutting.Core.Contract.csproj" />
+    <ProjectReference Include="..\Logic.Domain.CodeAnalysisManagement.Contract\Logic.Domain.CodeAnalysisManagement.Contract.csproj" />
+  </ItemGroup>
+
+</Project>

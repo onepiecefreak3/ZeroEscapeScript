@@ -1,0 +1,3 @@
+﻿namespace Logic.Domain.SpikeChunsoftManagement;
+
+public class SpikeChunsoftManagementConfiguration;
