@@ -16,7 +16,7 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
 
     private static void Write(Sir0ScriptData data, Stream output)
     {
-        using var writer = new BinaryWriterX(output, Encoding.GetEncoding("Shift-JIS"), true);
+        using var writer = new BinaryWriterX(output, Encoding.GetEncoding(932), true);
 
         writer.BaseStream.Position = 0x10;
 
@@ -29,7 +29,7 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
         int functionOffset = WriteFunctionEntries(writer, data.Functions, functionOffsets);
 
         int indexOffset = WriteIndex(writer, data, text1Offset, text2Offset, text3Offset, functionOffset);
-        int valueOffset = WriteValues(writer, data.Values);
+        int valueOffset = WriteOffsetCorrections(writer, data, text1Offset, text2Offset, text3Offset, functionOffset, indexOffset);
 
         writer.BaseStream.Position = 0;
         WriteHeader(writer, indexOffset, valueOffset);
@@ -119,13 +119,36 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
         return indexOffset;
     }
 
-    private static int WriteValues(BinaryWriterX writer, byte[] values)
+    private static int WriteOffsetCorrections(BinaryWriterX writer, Sir0ScriptData data, int text1Offset, int text2Offset, int text3Offset, int functionOffset, int indexOffset)
     {
         var valueOffset = (int)writer.BaseStream.Position;
 
-        writer.Write(values);
-        writer.Write((byte)0);
+        writer.Write((byte)4);
+        writer.Write((byte)4);
 
+        WriteVariableInt(writer, text1Offset - 8);
+        for (var i = 0; i < data.Texts1.Length - 1; i++)
+            writer.Write((byte)4);
+
+        WriteVariableInt(writer, text2Offset - (text1Offset + data.Texts1.Length * 4) + 4);
+        for (var i = 0; i < data.Texts2.Length - 1; i++)
+            writer.Write((byte)4);
+
+        WriteVariableInt(writer, text3Offset - (text2Offset + data.Texts2.Length * 4) + 4);
+        for (var i = 0; i < data.Texts3.Length - 1; i++)
+            writer.Write((byte)4);
+
+        WriteVariableInt(writer, functionOffset - (text3Offset + data.Texts3.Length * 4) + 4);
+        for (var i = 0; i < data.Functions.Length * 2 - 1; i++)
+            writer.Write((byte)4);
+
+        WriteVariableInt(writer, indexOffset - (functionOffset + data.Functions.Length * 8) + 4);
+
+        writer.Write((byte)4);
+        writer.Write((byte)8);
+        writer.Write((byte)4);
+        writer.Write((byte)4);
+        writer.Write((byte)0);
         writer.WriteAlignment(0x10, 0xaa);
 
         return valueOffset;
@@ -136,5 +159,25 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
         writer.WriteString("SIR0", writeNullTerminator: false);
         writer.Write(indexOffset);
         writer.Write(valueOffset);
+    }
+
+    private static void WriteVariableInt(BinaryWriterX writer, int value)
+    {
+        var bytes = new List<byte>(5);
+        do
+        {
+            bytes.Add((byte)(value & 0x7F));
+            value >>= 7;
+        } while (value > 0);
+
+        for (int i = bytes.Count - 1; i >= 0; i--)
+        {
+            byte part = bytes[i];
+
+            if (i > 0)
+                part |= 0x80;
+
+            writer.Write(part);
+        }
     }
 }

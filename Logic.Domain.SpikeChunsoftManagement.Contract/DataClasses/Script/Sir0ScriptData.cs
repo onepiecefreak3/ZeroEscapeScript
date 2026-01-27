@@ -7,5 +7,4 @@ public class Sir0ScriptData
     public required string[] Texts1 { get; set; }
     public required string[] Texts2 { get; set; }
     public required string[] Texts3 { get; set; }
-    public required byte[] Values { get; set; }
 }

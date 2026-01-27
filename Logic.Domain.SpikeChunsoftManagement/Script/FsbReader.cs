@@ -10,16 +10,13 @@ internal class FsbReader : IFsbReader
 {
     public Sir0ScriptData Read(Stream input)
     {
-        using var br = new BinaryReaderX(input, Encoding.GetEncoding("Shift-JIS"), true);
+        using var br = new BinaryReaderX(input, Encoding.GetEncoding(932), true);
 
         // Read header data
         var header = ReadHeader(br);
 
         br.BaseStream.Position = header.indexOffset;
         var index = ReadIndex(br);
-
-        br.BaseStream.Position = header.unkOffset;
-        var values = ReadBytes(br);
 
         // Read index data
         br.BaseStream.Position = index.nameOffset;
@@ -85,8 +82,7 @@ internal class FsbReader : IFsbReader
             Functions = [.. functions],
             Texts1 = [.. texts1],
             Texts2 = [.. texts2],
-            Texts3 = [.. texts3],
-            Values = values
+            Texts3 = [.. texts3]
         };
     }
 
@@ -145,20 +141,6 @@ internal class FsbReader : IFsbReader
         {
             result.Add(entry);
             entry = reader.ReadInt32();
-        }
-
-        return [.. result];
-    }
-
-    private byte[] ReadBytes(BinaryReaderX reader)
-    {
-        var result = new List<byte>();
-
-        var entry = reader.ReadByte();
-        while (entry is not 0)
-        {
-            result.Add(entry);
-            entry = reader.ReadByte();
         }
 
         return [.. result];

@@ -1,5 +1,6 @@
 ﻿using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
 using Logic.Domain.SpikeChunsoftManagement.Contract.Script;
+using Logic.Domain.SpikeChunsoftManagement.Script.Sorting;
 using System.Buffers.Binary;
 
 namespace Logic.Domain.SpikeChunsoftManagement.Script;
@@ -9,7 +10,7 @@ internal class FsbComposer : IFsbComposer
     public Sir0ScriptData Compose(Sir0Script script)
     {
         var result = new List<Sir0FunctionData>();
-        var texts = new Dictionary<string, short>();
+        var texts = CreateStringLookup(script.Functions);
 
         foreach (Sir0Function function in script.Functions)
         {
@@ -23,14 +24,13 @@ internal class FsbComposer : IFsbComposer
         {
             Name = script.Name,
             Functions = [.. result],
-            Texts1 = [.. texts.Keys],
+            Texts1 = texts,
             Texts2 = script.Texts2,
-            Texts3 = script.Texts3,
-            Values = script.Values
+            Texts3 = script.Texts3
         };
     }
 
-    private static Sir0FunctionData CreateFunction(Sir0Function function, bool isLast, Dictionary<string, short> texts, Dictionary<string, int> jumpOffsets)
+    private static Sir0FunctionData CreateFunction(Sir0Function function, bool isLast, string[] texts, Dictionary<string, int> jumpOffsets)
     {
         var data = new List<byte>(0x100);
 
@@ -107,7 +107,7 @@ internal class FsbComposer : IFsbComposer
                 case 0x2F:
                 case 0x31: //*
                 case 0x33:
-                case 0x34: //x
+                case 0x34:
                     if (operation.Arguments.Length <= 0)
                         throw new InvalidOperationException("No string value was given.");
 
@@ -214,6 +214,30 @@ internal class FsbComposer : IFsbComposer
         };
     }
 
+    private static string[] CreateStringLookup(Sir0Function[] functions)
+    {
+        var texts = new HashSet<string> { string.Empty };
+
+        foreach (Sir0Operation operation in functions.SelectMany(f => f.Operations))
+        {
+            if (operation.Command is 0x35 or 0x36 or 0x37)
+                continue;
+
+            foreach (object argument in operation.Arguments)
+            {
+                if (argument is not string stringValue)
+                    continue;
+
+                texts.Add(stringValue);
+            }
+        }
+
+        string[] result = [.. texts];
+        Array.Sort(result, new Cp932Comparer());
+
+        return result;
+    }
+
     private static Dictionary<string, int> CreateJumpOffsets(Sir0Function function)
     {
         var result = new Dictionary<string, int>();
@@ -286,7 +310,7 @@ internal class FsbComposer : IFsbComposer
                 case 0x31: //*
                 case 0x32:
                 case 0x33:
-                case 0x34: //x
+                case 0x34:
                 case 0x35:
                 case 0x36:
                 case 0x37:
@@ -350,18 +374,12 @@ internal class FsbComposer : IFsbComposer
         return (short)value;
     }
 
-    private static short GetStringIndex(object argument, Dictionary<string, short> cache)
+    private static short GetStringIndex(object argument, string[] cache)
     {
         if (argument is not string stringValue)
             throw new InvalidOperationException("Invalid string value was given.");
 
-        if (!cache.TryGetValue(stringValue, out short stringIndex))
-        {
-            stringIndex = (short)cache.Keys.Count;
-            cache[stringValue] = stringIndex;
-        }
-
-        return stringIndex;
+        return (short)Array.IndexOf(cache, stringValue);
     }
 
     private static int GetVariableInt(object argument)

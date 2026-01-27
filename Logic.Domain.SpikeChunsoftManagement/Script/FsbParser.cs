@@ -16,8 +16,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
             Name = scriptData.Name,
             Functions = functions,
             Texts2 = scriptData.Texts2,
-            Texts3 = scriptData.Texts3,
-            Values = scriptData.Values
+            Texts3 = scriptData.Texts3
         };
     }
 
@@ -105,7 +104,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
                 case 0x2F:
                 case 0x31: //*
                 case 0x33:
-                case 0x34: //x
+                case 0x34:
                     i += 3;
                     int index3 = BinaryPrimitives.ReadInt16LittleEndian(functionData.Data.AsSpan(i - 2));
                     operations.Add(new Sir0Operation(jumpLabel, functionData.Data[i - 3], [scriptData.Texts1[index3]]));
@@ -231,7 +230,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
                 case 0x31: //*
                 case 0x32:
                 case 0x33:
-                case 0x34: //x
+                case 0x34:
                     i += 3;
                     break;
 

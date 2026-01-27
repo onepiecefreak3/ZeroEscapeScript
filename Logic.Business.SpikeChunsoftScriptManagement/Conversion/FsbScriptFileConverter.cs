@@ -93,6 +93,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 return null;
 
             case 0x26:
+            case 0x30:
                 return CreateReturnStatement();
 
             default:
