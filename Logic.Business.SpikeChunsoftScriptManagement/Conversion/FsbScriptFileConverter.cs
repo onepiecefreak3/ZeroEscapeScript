@@ -230,13 +230,13 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         for (var i = 0; i < blocks.Count; i++)
         {
             StatementBlock block = blocks[i];
-            if (block.TerminalCommand is not (0x36 or 0x37))
+            if (block.TerminalCommand is not (0x35 or 0x36 or 0x37))
                 continue;
 
             if (block.JumpLabel is null || !labelLookup.TryGetValue(block.JumpLabel, out int targetIndex))
                 continue;
 
-            if (targetIndex >= i)
+            if (targetIndex > i)
                 continue;
 
             result.TryAdd(targetIndex, i);
@@ -284,7 +284,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     }
 
     private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int index, int endIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+        Dictionary<int, int> loopBounds, int index, int endIndex, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = index + 1;
@@ -321,7 +321,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     }
 
     private bool TryBuildIfElse(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int thenStart, int thenEnd, int targetIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+        Dictionary<int, int> loopBounds, int thenStart, int thenEnd, int targetIndex, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = targetIndex;
@@ -345,7 +345,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     }
 
     private bool TryBuildIfElseForJumpOnTrue(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int elseStart, int elseEnd, int targetIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+        Dictionary<int, int> loopBounds, int elseStart, int elseEnd, int targetIndex, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = targetIndex;

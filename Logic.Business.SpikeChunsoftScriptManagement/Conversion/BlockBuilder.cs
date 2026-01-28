@@ -10,7 +10,6 @@ internal class BlockBuilder : IBlockBuilder
     {
         List<StatementBlock> blocks = CreateBlocks(operations, out List<BlockInfo> blockInfos);
         RelateBlocks(blockInfos);
-        //ReduceBlocks(blocks, blockInfos);
 
         return blocks;
     }
@@ -139,36 +138,6 @@ internal class BlockBuilder : IBlockBuilder
 
         if (!child.Parents.Contains(parent))
             child.Parents.Add(parent);
-    }
-
-    private void ReduceBlocks(List<StatementBlock> blocks, List<BlockInfo> blockInfos)
-    {
-        for (var i = 0; i < blocks.Count;)
-        {
-            StatementBlock block = blocks[i];
-
-            if (block.Operations.Count != 1 || block.TerminalCommand is not 0x35)
-            {
-                i++;
-                continue;
-            }
-
-            StatementBlock child = block.Children[0];
-
-            foreach (string label in block.Labels)
-                child.Labels.Add(label);
-
-            foreach (StatementBlock parent in block.Parents.ToArray())
-            {
-                parent.Children.Remove(block);
-                AddBlockRelation(parent, child);
-            }
-
-            child.Parents.Remove(block);
-
-            blocks.RemoveAt(i);
-            blockInfos.RemoveAt(i);
-        }
     }
 
     private static bool IsBlockTerminator(byte command)
