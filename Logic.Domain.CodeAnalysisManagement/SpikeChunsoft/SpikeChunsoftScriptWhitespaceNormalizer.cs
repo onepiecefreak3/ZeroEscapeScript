@@ -1,4 +1,4 @@
-﻿using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
+using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
@@ -93,12 +93,28 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         switch (statement)
         {
-            case GotoLabelStatementSyntax gotoStatement:
-                NormalizeGotoLabelStatement(gotoStatement, ctx);
-                break;
-
             case AsyncBlockStatement asyncStatement:
                 NormalizeAsyncBlockStatement(asyncStatement, ctx);
+                break;
+
+            case IfStatementSyntax ifStatement:
+                NormalizeIfStatement(ifStatement, ctx);
+                break;
+
+            case IfElseStatementSyntax ifElseStatement:
+                NormalizeIfElseStatement(ifElseStatement, ctx);
+                break;
+
+            case DoWhileStatementSyntax doWhileStatement:
+                NormalizeDoWhileStatement(doWhileStatement, ctx);
+                break;
+
+            case BreakStatementSyntax breakStatement:
+                NormalizeBreakStatement(breakStatement, ctx);
+                break;
+
+            case ContinueStatementSyntax continueStatement:
+                NormalizeContinueStatement(continueStatement, ctx);
                 break;
 
             case ReturnStatementSyntax returnStatement:
@@ -109,22 +125,6 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeMethodInvocationStatement(methodInvocationStatement, ctx);
                 break;
         }
-    }
-
-    private void NormalizeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, WhitespaceNormalizeContext ctx)
-    {
-        SyntaxToken newLiteral = gotoLabelStatement.Label.Literal.WithNoTrivia();
-        SyntaxToken newColon = gotoLabelStatement.Colon.WithNoTrivia();
-
-        int indent = ctx.Indent - 1;
-        if (ctx.ShouldIndent && indent > 0)
-            newLiteral = newLiteral.WithLeadingTrivia(new string('\t', indent));
-
-        if (ctx.ShouldLineBreak)
-            newColon = newColon.WithTrailingTrivia("\r\n");
-
-        gotoLabelStatement.Label.SetLiteral(newLiteral, false);
-        gotoLabelStatement.SetColon(newColon, false);
     }
 
     private void NormalizeReturnStatement(ReturnStatementSyntax returnStatement, WhitespaceNormalizeContext ctx)
@@ -162,17 +162,123 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         SyntaxToken asyncKeyword = asyncBlock.Async.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
         asyncBlock.SetAsync(asyncKeyword, false);
 
-        NormalizeAsyncBlockBody(asyncBlock.Body, ctx);
+        NormalizeBlock(asyncBlock.Body, ctx, "\r\n");
     }
 
-    private void NormalizeAsyncBlockBody(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx)
+    private void NormalizeIfStatement(IfStatementSyntax ifStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken ifToken = ifStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken parenOpen = ifStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = ifStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
+
+        ifStatement.SetIf(ifToken, false);
+        ifStatement.SetParenOpen(parenOpen, false);
+        ifStatement.SetParenClose(parenClose, false);
+
+        NormalizeBlock(ifStatement.Body, ctx, "\r\n");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(ifStatement.Condition, ctx);
+    }
+
+    private void NormalizeIfElseStatement(IfElseStatementSyntax ifElseStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken ifToken = ifElseStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken elseToken = ifElseStatement.Else.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken parenOpen = ifElseStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = ifElseStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
+
+        ifElseStatement.SetIf(ifToken, false);
+        ifElseStatement.SetElse(elseToken, false);
+        ifElseStatement.SetParenOpen(parenOpen, false);
+        ifElseStatement.SetParenClose(parenClose, false);
+
+        NormalizeBlock(ifElseStatement.Body, ctx, "\r\n");
+        NormalizeBlock(ifElseStatement.ElseBody, ctx, "\r\n");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(ifElseStatement.Condition, ctx);
+    }
+
+    private void NormalizeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken doToken = doWhileStatement.Do.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken whileToken = doWhileStatement.While.WithNoTrivia().WithTrailingTrivia(" ");
+        SyntaxToken parenOpen = doWhileStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = doWhileStatement.ParenClose.WithNoTrivia();
+        SyntaxToken semicolon = doWhileStatement.Semicolon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            semicolon = semicolon.WithTrailingTrivia("\r\n");
+
+        doWhileStatement.SetWhile(whileToken, false);
+        doWhileStatement.SetParenOpen(parenOpen, false);
+        doWhileStatement.SetParenClose(parenClose, false);
+        doWhileStatement.SetDo(doToken, false);
+        doWhileStatement.SetSemicolon(semicolon, false);
+
+        NormalizeBlock(doWhileStatement.Body, ctx, " ");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(doWhileStatement.Condition, ctx);
+    }
+
+    private void NormalizeBreakStatement(BreakStatementSyntax breakStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken breakToken = breakStatement.Break.WithNoTrivia();
+        SyntaxToken semicolon = breakStatement.Semicolon.WithNoTrivia();
+
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            breakToken = breakToken.WithLeadingTrivia(new string('\t', ctx.Indent));
+
+        if (ctx.ShouldLineBreak)
+            semicolon = semicolon.WithTrailingTrivia("\r\n");
+
+        breakStatement.SetBreak(breakToken, false);
+        breakStatement.SetSemicolon(semicolon, false);
+    }
+
+    private void NormalizeContinueStatement(ContinueStatementSyntax continueStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken continueToken = continueStatement.Continue.WithNoTrivia();
+        SyntaxToken semicolon = continueStatement.Semicolon.WithNoTrivia();
+
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            continueToken = continueToken.WithLeadingTrivia(new string('\t', ctx.Indent));
+
+        if (ctx.ShouldLineBreak)
+            semicolon = semicolon.WithTrailingTrivia("\r\n");
+
+        continueStatement.SetContinue(continueToken, false);
+        continueStatement.SetSemicolon(semicolon, false);
+    }
+
+    private void NormalizeBlock(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx, string? trailingTrivia)
     {
         string? leadingTrivia = null;
         if (ctx is { ShouldIndent: true, Indent: > 0 })
             leadingTrivia = new string('\t', ctx.Indent);
 
         SyntaxToken newCurlyOpen = methodDeclarationBody.CurlyOpen.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
-        SyntaxToken newCurlyClose = methodDeclarationBody.CurlyClose.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken newCurlyClose = methodDeclarationBody.CurlyClose.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(trailingTrivia);
 
         methodDeclarationBody.SetCurlyOpen(newCurlyOpen, false);
         methodDeclarationBody.SetCurlyClose(newCurlyClose, false);

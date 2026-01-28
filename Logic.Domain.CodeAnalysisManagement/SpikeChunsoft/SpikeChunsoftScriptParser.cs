@@ -1,4 +1,4 @@
-﻿using Logic.Domain.CodeAnalysisManagement.Contract;
+using Logic.Domain.CodeAnalysisManagement.Contract;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions.SpikeChunsoft;
@@ -108,6 +108,10 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.IfKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.DoKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.BreakKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ContinueKeyword) ||
                IsMethodInvocation(buffer);
     }
 
@@ -127,6 +131,18 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         if (HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword))
             return ParseAsyncBlockStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.IfKeyword))
+            return ParseIfStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.DoKeyword))
+            return ParseDoWhileStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.BreakKeyword))
+            return ParseBreakStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.ContinueKeyword))
+            return ParseContinueStatement(buffer);
 
         if (IsMethodInvocation(buffer))
             return ParseMethodInvocationStatement(buffer);
@@ -158,7 +174,62 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return new AsyncBlockStatement(asyncToken, body);
     }
 
+    private StatementSyntax ParseIfStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken ifToken = ParseIfKeywordToken(buffer);
+        SyntaxToken parenOpen = ParseParenOpenToken(buffer);
+        LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
+        SyntaxToken parenClose = ParseParenCloseToken(buffer);
+        BlockExpression body = ParseBlockExpression(buffer);
+
+        if (!HasTokenKind(buffer, SyntaxTokenKind.ElseKeyword))
+            return new IfStatementSyntax(ifToken, parenOpen, condition, parenClose, body);
+
+        SyntaxToken elseToken = ParseElseKeywordToken(buffer);
+        BlockExpression elseBody = ParseBlockExpression(buffer);
+
+        return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+    }
+
+    private StatementSyntax ParseDoWhileStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken doToken = ParseDoKeywordToken(buffer);
+        BlockExpression body = ParseBlockExpression(buffer);
+        SyntaxToken whileToken = ParseWhileKeywordToken(buffer);
+        SyntaxToken parenOpen = ParseParenOpenToken(buffer);
+        LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
+        SyntaxToken parenClose = ParseParenCloseToken(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
+    }
+
+    private StatementSyntax ParseBreakStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken breakToken = ParseBreakKeywordToken(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new BreakStatementSyntax(breakToken, semicolon);
+    }
+
+    private StatementSyntax ParseContinueStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken continueToken = ParseContinueKeywordToken(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new ContinueStatementSyntax(continueToken, semicolon);
+    }
+
     private BlockExpression ParseAsyncBlockBody(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken curlyOpenToken = ParseCurlyOpenToken(buffer);
+        var expressions = ParseStatements(buffer);
+        SyntaxToken curlyCloseToken = ParseCurlyCloseToken(buffer);
+
+        return new BlockExpression(curlyOpenToken, expressions, curlyCloseToken);
+    }
+
+    private BlockExpression ParseBlockExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         SyntaxToken curlyOpenToken = ParseCurlyOpenToken(buffer);
         var expressions = ParseStatements(buffer);
@@ -319,6 +390,36 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseAsyncKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.AsyncKeyword);
+    }
+
+    private SyntaxToken ParseIfKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.IfKeyword);
+    }
+
+    private SyntaxToken ParseElseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ElseKeyword);
+    }
+
+    private SyntaxToken ParseDoKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.DoKeyword);
+    }
+
+    private SyntaxToken ParseWhileKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.WhileKeyword);
+    }
+
+    private SyntaxToken ParseBreakKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.BreakKeyword);
+    }
+
+    private SyntaxToken ParseContinueKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ContinueKeyword);
     }
 
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

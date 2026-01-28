@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Logic.Domain.CodeAnalysisManagement.Contract;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions;
@@ -587,6 +587,21 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
 
             case "if":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.IfKeyword, position, line, column, finalValue);
+
+            case "else":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ElseKeyword, position, line, column, finalValue);
+
+            case "do":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.DoKeyword, position, line, column, finalValue);
+
+            case "while":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.WhileKeyword, position, line, column, finalValue);
+
+            case "break":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.BreakKeyword, position, line, column, finalValue);
+
+            case "continue":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ContinueKeyword, position, line, column, finalValue);
 
             case "int":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.IntKeyword, position, line, column, finalValue);

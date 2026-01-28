@@ -1,4 +1,4 @@
-﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
+namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
 public enum SyntaxTokenKind
 {
@@ -73,6 +73,11 @@ public enum SyntaxTokenKind
     SwitchKeyword,
     GotoKeyword,
     IfKeyword,
+    ElseKeyword,
+    DoKeyword,
+    WhileKeyword,
+    BreakKeyword,
+    ContinueKeyword,
     IntKeyword,
     BoolKeyword,
     FloatKeyword,

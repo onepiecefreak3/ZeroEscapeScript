@@ -1,19 +1,12 @@
-﻿using System.Text;
+using System.Text;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
-internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
+internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFactory) : ISpikeChunsoftScriptComposer
 {
-    private readonly ISpikeChunsoftSyntaxFactory _syntaxFactory;
-
-    public SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFactory)
-    {
-        _syntaxFactory = syntaxFactory;
-    }
-
     public string ComposeCodeUnit(CodeUnitSyntax codeUnit)
     {
         var sb = new StringBuilder();
@@ -51,7 +44,7 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
         for (var i = 0; i < valueList.Elements.Count - 1; i++)
         {
             ComposeLiteralExpression(valueList.Elements[i], sb);
-            ComposeSyntaxToken(_syntaxFactory.Token(SyntaxTokenKind.Comma), sb);
+            ComposeSyntaxToken(syntaxFactory.Token(SyntaxTokenKind.Comma), sb);
         }
 
         ComposeLiteralExpression(valueList.Elements[^1], sb);
@@ -71,12 +64,28 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
     {
         switch (statement)
         {
-            case GotoLabelStatementSyntax gotoStatement:
-                ComposeGotoLabelStatement(gotoStatement, sb);
-                break;
-
             case AsyncBlockStatement asyncStatement:
                 ComposeAsyncBlockStatement(asyncStatement, sb);
+                break;
+
+            case IfStatementSyntax ifStatement:
+                ComposeIfStatement(ifStatement, sb);
+                break;
+
+            case IfElseStatementSyntax ifElseStatement:
+                ComposeIfElseStatement(ifElseStatement, sb);
+                break;
+
+            case DoWhileStatementSyntax doWhileStatement:
+                ComposeDoWhileStatement(doWhileStatement, sb);
+                break;
+
+            case BreakStatementSyntax breakStatement:
+                ComposeBreakStatement(breakStatement, sb);
+                break;
+
+            case ContinueStatementSyntax continueStatement:
+                ComposeContinueStatement(continueStatement, sb);
                 break;
 
             case ReturnStatementSyntax returnStatement:
@@ -89,19 +98,13 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
         }
     }
 
-    private void ComposeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, StringBuilder sb)
-    {
-        ComposeLiteralExpression(gotoLabelStatement.Label, sb);
-        ComposeSyntaxToken(gotoLabelStatement.Colon, sb);
-    }
-
     private void ComposeAsyncBlockStatement(AsyncBlockStatement asyncStatement, StringBuilder sb)
     {
         ComposeSyntaxToken(asyncStatement.Async, sb);
-        ComposeAsyncBlockBody(asyncStatement.Body, sb);
+        ComposeBlock(asyncStatement.Body, sb);
     }
 
-    private void ComposeAsyncBlockBody(BlockExpression blockExpression, StringBuilder sb)
+    private void ComposeBlock(BlockExpression blockExpression, StringBuilder sb)
     {
         ComposeSyntaxToken(blockExpression.CurlyOpen, sb);
 
@@ -109,6 +112,49 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
             ComposeStatement(expression, sb);
 
         ComposeSyntaxToken(blockExpression.CurlyClose, sb);
+    }
+
+    private void ComposeIfStatement(IfStatementSyntax ifStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(ifStatement.If, sb);
+        ComposeSyntaxToken(ifStatement.ParenOpen, sb);
+        ComposeLiteralExpression(ifStatement.Condition, sb);
+        ComposeSyntaxToken(ifStatement.ParenClose, sb);
+        ComposeBlock(ifStatement.Body, sb);
+    }
+
+    private void ComposeIfElseStatement(IfElseStatementSyntax ifElseStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(ifElseStatement.If, sb);
+        ComposeSyntaxToken(ifElseStatement.ParenOpen, sb);
+        ComposeLiteralExpression(ifElseStatement.Condition, sb);
+        ComposeSyntaxToken(ifElseStatement.ParenClose, sb);
+        ComposeBlock(ifElseStatement.Body, sb);
+        ComposeSyntaxToken(ifElseStatement.Else, sb);
+        ComposeBlock(ifElseStatement.ElseBody, sb);
+    }
+
+    private void ComposeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(doWhileStatement.Do, sb);
+        ComposeBlock(doWhileStatement.Body, sb);
+        ComposeSyntaxToken(doWhileStatement.While, sb);
+        ComposeSyntaxToken(doWhileStatement.ParenOpen, sb);
+        ComposeLiteralExpression(doWhileStatement.Condition, sb);
+        ComposeSyntaxToken(doWhileStatement.ParenClose, sb);
+        ComposeSyntaxToken(doWhileStatement.Semicolon, sb);
+    }
+
+    private void ComposeBreakStatement(BreakStatementSyntax breakStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(breakStatement.Break, sb);
+        ComposeSyntaxToken(breakStatement.Semicolon, sb);
+    }
+
+    private void ComposeContinueStatement(ContinueStatementSyntax continueStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(continueStatement.Continue, sb);
+        ComposeSyntaxToken(continueStatement.Semicolon, sb);
     }
 
     private void ComposeReturnStatement(ReturnStatementSyntax returnStatement, StringBuilder sb)

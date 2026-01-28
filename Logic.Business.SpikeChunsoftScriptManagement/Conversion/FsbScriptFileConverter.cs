@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Logic.Business.SpikeChunsoftScriptManagement.DataClasses.Conversion;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
@@ -60,48 +61,15 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
     {
         IReadOnlyList<StatementBlock> blocks = blockBuilder.CreateStatementBlocks(operations);
-        var result = new List<StatementSyntax>();
-
-        foreach (StatementBlock block in blocks)
-        {
-            Sir0Operation[] blockOperations = [.. block.Operations];
-
-            for (var index = 0; index < blockOperations.Length;)
-            {
-                Sir0Operation operation = blockOperations[index];
-
-                if (operation.Label is not null)
-                    result.Add(CreateGotoLabelStatement(operation.Label));
-
-                StatementSyntax? statement = CreateStatement(blockOperations, ref index);
-                if (statement is not null)
-                    result.Add(statement);
-
-                if (operation.Label is not null && index < blockOperations.Length && blockOperations[index] == operation)
-                    index++;
-            }
-        }
-
-        return result;
+        return CreateStatements(blocks);
     }
 
-    private GotoLabelStatementSyntax CreateGotoLabelStatement(string label)
-    {
-        var labelLiteral = CreateStringLiteralExpression(label);
-        SyntaxToken colonToken = syntaxFactory.Token(SyntaxTokenKind.Colon);
-
-        return new GotoLabelStatementSyntax(labelLiteral, colonToken);
-    }
-
-    private StatementSyntax? CreateStatement(Sir0Operation[] operations, ref int index)
+    private StatementSyntax CreateStatement(Sir0Operation[] operations, ref int index)
     {
         Sir0Operation operation = operations[index++];
 
         switch (operation.Command)
         {
-            case 0x25:
-                return null;
-
             case 0x26:
             case 0x30:
                 return CreateReturnStatement();
@@ -228,5 +196,248 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         }
 
         return result!;
+    }
+
+    private IReadOnlyList<StatementSyntax> CreateStatements(IReadOnlyList<StatementBlock> blocks)
+    {
+        if (blocks.Count == 0)
+            return [];
+
+        IReadOnlyDictionary<string, int> labelLookup = CreateLabelLookup(blocks);
+        Dictionary<int, int> loopBounds = CreateLoopBounds(blocks, labelLookup);
+
+        return BuildStatementsRange(blocks, labelLookup, loopBounds, 0, blocks.Count);
+    }
+
+    private IReadOnlyDictionary<string, int> CreateLabelLookup(IReadOnlyList<StatementBlock> blocks)
+    {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            foreach (string label in blocks[i].Labels)
+            {
+                if (!result.TryAdd(label, i))
+                    throw new InvalidOperationException($"Duplicate jump label {label}.");
+            }
+        }
+
+        return result;
+    }
+
+    private Dictionary<int, int> CreateLoopBounds(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup)
+    {
+        var result = new Dictionary<int, int>();
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            StatementBlock block = blocks[i];
+            if (block.TerminalCommand is not (0x36 or 0x37))
+                continue;
+
+            if (block.JumpLabel is null || !labelLookup.TryGetValue(block.JumpLabel, out int targetIndex))
+                continue;
+
+            if (targetIndex >= i)
+                continue;
+
+            result.TryAdd(targetIndex, i);
+        }
+
+        return result;
+    }
+
+    private IReadOnlyList<StatementSyntax> BuildStatementsRange(IReadOnlyList<StatementBlock> blocks,
+        IReadOnlyDictionary<string, int> labelLookup, Dictionary<int, int> loopBounds, int startIndex, int endIndex)
+    {
+        var result = new List<StatementSyntax>();
+        for (var i = startIndex; i < endIndex;)
+        {
+            if (loopBounds.TryGetValue(i, out int loopEnd) && loopEnd < endIndex)
+            {
+                IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRangePlain(blocks, i, loopEnd + 1);
+                result.Add(CreateDoWhileStatement(bodyStatements));
+                i = loopEnd + 1;
+                continue;
+            }
+
+            if (TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, out StatementSyntax? ifStatement, out int nextIndex))
+            {
+                result.AddRange(CreateStatementsFromBlock(blocks[i], true));
+                result.Add(ifStatement);
+                i = nextIndex;
+                continue;
+            }
+
+            result.AddRange(CreateStatementsFromBlock(blocks[i++], true));
+        }
+
+        return result;
+    }
+
+    private IReadOnlyList<StatementSyntax> BuildStatementsRangePlain(IReadOnlyList<StatementBlock> blocks, int startIndex, int endIndex)
+    {
+        var result = new List<StatementSyntax>();
+
+        for (var i = startIndex; i < endIndex; i++)
+            result.AddRange(CreateStatementsFromBlock(blocks[i], i == endIndex - 1));
+
+        return result;
+    }
+
+    private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
+        Dictionary<int, int> loopBounds, int index, int endIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+    {
+        statement = null;
+        nextIndex = index + 1;
+
+        StatementBlock block = blocks[index];
+        if (block.TerminalCommand is not (0x36 or 0x37) || block.JumpLabel is null)
+            return false;
+
+        if (!labelLookup.TryGetValue(block.JumpLabel, out int targetIndex))
+            return false;
+
+        if (targetIndex <= index || targetIndex > endIndex)
+            return false;
+
+        if (block.TerminalCommand is 0x37)
+        {
+            int thenStart = index + 1;
+            int thenEnd = targetIndex;
+            if (TryBuildIfElse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, out statement, out nextIndex))
+                return true;
+
+            IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd);
+            statement = CreateIfStatement(thenStatements);
+            nextIndex = targetIndex;
+            return true;
+        }
+
+        int elseStart = index + 1;
+        int elseEnd = targetIndex;
+        if (!TryBuildIfElseForJumpOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, out statement, out nextIndex))
+            return false;
+
+        return true;
+    }
+
+    private bool TryBuildIfElse(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
+        Dictionary<int, int> loopBounds, int thenStart, int thenEnd, int targetIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+    {
+        statement = null;
+        nextIndex = targetIndex;
+
+        if (thenStart >= thenEnd)
+            return false;
+
+        StatementBlock endThenBlock = blocks[thenEnd - 1];
+        if (endThenBlock.TerminalCommand is not 0x35 || endThenBlock.JumpLabel is null)
+            return false;
+
+        if (!labelLookup.TryGetValue(endThenBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
+            return false;
+
+        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd);
+        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex);
+
+        statement = CreateIfElseStatement(thenStatements, elseStatements);
+        nextIndex = endIndex;
+        return true;
+    }
+
+    private bool TryBuildIfElseForJumpOnTrue(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
+        Dictionary<int, int> loopBounds, int elseStart, int elseEnd, int targetIndex, [NotNullWhen(true)]out StatementSyntax? statement, out int nextIndex)
+    {
+        statement = null;
+        nextIndex = targetIndex;
+
+        if (elseStart >= elseEnd)
+            return false;
+
+        StatementBlock endElseBlock = blocks[elseEnd - 1];
+        if (endElseBlock.TerminalCommand is not 0x35 || endElseBlock.JumpLabel is null)
+            return false;
+
+        if (!labelLookup.TryGetValue(endElseBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
+            return false;
+
+        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex);
+        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd);
+
+        statement = CreateIfElseStatement(thenStatements, elseStatements);
+        nextIndex = endIndex;
+        return true;
+    }
+
+    private IReadOnlyList<StatementSyntax> CreateStatementsFromBlock(StatementBlock block, bool skipTerminalJump)
+    {
+        var result = new List<StatementSyntax>();
+        Sir0Operation[] blockOperations = [.. block.Operations];
+        int endIndex = blockOperations.Length;
+
+        if (skipTerminalJump && block.TerminalCommand is 0x35 or 0x36 or 0x37 && endIndex > 0)
+            endIndex--;
+
+        for (var index = 0; index < endIndex;)
+        {
+            if (blockOperations[index].Command is 0x25 or 0x35 or 0x36 or 0x37)
+            {
+                index++;
+                continue;
+            }
+
+            result.Add(CreateStatement(blockOperations, ref index));
+        }
+
+        return result;
+    }
+
+    private IfStatementSyntax CreateIfStatement(IReadOnlyList<StatementSyntax> thenStatements)
+    {
+        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        LiteralExpressionSyntax condition = CreateConditionExpression();
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        BlockExpression body = CreateBlockExpression(thenStatements);
+
+        return new IfStatementSyntax(ifToken, parenOpen, condition, parenClose, body);
+    }
+
+    private IfElseStatementSyntax CreateIfElseStatement(IReadOnlyList<StatementSyntax> thenStatements, IReadOnlyList<StatementSyntax> elseStatements)
+    {
+        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        LiteralExpressionSyntax condition = CreateConditionExpression();
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        BlockExpression body = CreateBlockExpression(thenStatements);
+        SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
+        BlockExpression elseBody = CreateBlockExpression(elseStatements);
+
+        return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+    }
+
+    private DoWhileStatementSyntax CreateDoWhileStatement(IReadOnlyList<StatementSyntax> bodyStatements)
+    {
+        SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
+        BlockExpression body = CreateBlockExpression(bodyStatements);
+        SyntaxToken whileToken = syntaxFactory.Token(SyntaxTokenKind.WhileKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        LiteralExpressionSyntax condition = CreateConditionExpression();
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
+    }
+
+    private LiteralExpressionSyntax CreateConditionExpression()
+    {
+        return CreateNumericLiteralExpression(1);
+    }
+
+    private BlockExpression CreateBlockExpression(IReadOnlyList<StatementSyntax> statements)
+    {
+        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+
+        return new BlockExpression(curlyOpen, statements, curlyClose);
     }
 }

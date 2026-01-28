@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
@@ -60,23 +60,15 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
             case SyntaxTokenKind.ParenClose: return new(")", (int)kind);
             case SyntaxTokenKind.CurlyOpen: return new("{", (int)kind);
             case SyntaxTokenKind.CurlyClose: return new("}", (int)kind);
-            case SyntaxTokenKind.BracketOpen: return new("[", (int)kind);
-            case SyntaxTokenKind.BracketClose: return new("]", (int)kind);
 
-            case SyntaxTokenKind.YieldKeyword: return new("yield", (int)kind);
             case SyntaxTokenKind.ReturnKeyword: return new("return", (int)kind);
             case SyntaxTokenKind.AsyncKeyword: return new("async", (int)kind);
-            case SyntaxTokenKind.ExitKeyword: return new("exit", (int)kind);
-            case SyntaxTokenKind.NewKeyword: return new("new", (int)kind);
-            case SyntaxTokenKind.NotKeyword: return new("not", (int)kind);
-            case SyntaxTokenKind.OrKeyword: return new("or", (int)kind);
-            case SyntaxTokenKind.AndKeyword: return new("and", (int)kind);
-            case SyntaxTokenKind.SwitchKeyword: return new("switch", (int)kind);
-            case SyntaxTokenKind.GotoKeyword: return new("goto", (int)kind);
             case SyntaxTokenKind.IfKeyword: return new("if", (int)kind);
-            case SyntaxTokenKind.IntKeyword: return new("int", (int)kind);
-            case SyntaxTokenKind.BoolKeyword: return new("bool", (int)kind);
-            case SyntaxTokenKind.FloatKeyword: return new("float", (int)kind);
+            case SyntaxTokenKind.ElseKeyword: return new("else", (int)kind);
+            case SyntaxTokenKind.DoKeyword: return new("do", (int)kind);
+            case SyntaxTokenKind.WhileKeyword: return new("while", (int)kind);
+            case SyntaxTokenKind.BreakKeyword: return new("break", (int)kind);
+            case SyntaxTokenKind.ContinueKeyword: return new("continue", (int)kind);
             default: throw new InvalidOperationException($"Cannot create simple token from kind {kind}. Use other methods instead.");
         }
     }
@@ -84,16 +76,6 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
     public SyntaxToken NumericLiteral(long value)
     {
         return new($"{value}", (int)SyntaxTokenKind.NumericLiteral);
-    }
-
-    public SyntaxToken HashNumericLiteral(ulong value)
-    {
-        return new($"0x{value:X8}h", (int)SyntaxTokenKind.HashNumericLiteral);
-    }
-
-    public SyntaxToken HashStringLiteral(string text)
-    {
-        return new($"\"{text}\"h", (int)SyntaxTokenKind.HashStringLiteral);
     }
 
     public SyntaxToken FloatingNumericLiteral(float value)
@@ -109,10 +91,5 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
     public SyntaxToken Identifier(string text)
     {
         return new(text, (int)SyntaxTokenKind.Identifier);
-    }
-
-    public SyntaxToken Variable(string name, uint slot)
-    {
-        return new($"${name}{slot}", (int)SyntaxTokenKind.Variable);
     }
 }

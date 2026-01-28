@@ -10,10 +10,7 @@ public interface ISpikeChunsoftSyntaxFactory
     SyntaxToken Token(SyntaxTokenKind kind);
 
     SyntaxToken NumericLiteral(long value);
-    SyntaxToken HashNumericLiteral(ulong value);
-    SyntaxToken HashStringLiteral(string text);
     SyntaxToken FloatingNumericLiteral(float value);
     SyntaxToken StringLiteral(string text);
     SyntaxToken Identifier(string text);
-    SyntaxToken Variable(string name, uint slot);
 }
