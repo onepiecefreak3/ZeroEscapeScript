@@ -49,25 +49,32 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new MethodDeclarationParametersSyntax(parenOpen, null, parenClose);
     }
 
-    private MethodDeclarationBodySyntax CreateMethodDeclarationBody(Sir0Function function)
+    private BlockExpression CreateMethodDeclarationBody(Sir0Function function)
     {
         SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         var expressions = CreateStatements(function);
         SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
-        return new MethodDeclarationBodySyntax(curlyOpen, expressions, curlyClose);
+        return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
 
     private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Function function)
     {
+        return CreateStatements(function.Operations);
+    }
+
+    private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
+    {
         var result = new List<StatementSyntax>();
 
-        foreach (Sir0Operation operation in function.Operations)
+        for (var i = 0; i < operations.Length;)
         {
+            Sir0Operation operation = operations[i];
+
             if (operation.Label is not null)
                 result.Add(CreateGotoLabelStatement(operation.Label));
 
-            var statement = CreateStatement(operation);
+            var statement = CreateStatement(operations, ref i);
             if (statement is null)
                 continue;
 
@@ -85,8 +92,10 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new GotoLabelStatementSyntax(labelLiteral, colonToken);
     }
 
-    private StatementSyntax? CreateStatement(Sir0Operation operation)
+    private StatementSyntax? CreateStatement(Sir0Operation[] operations, ref int index)
     {
+        Sir0Operation operation = operations[index++];
+
         switch (operation.Command)
         {
             case 0x25:
@@ -95,6 +104,9 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
             case 0x26:
             case 0x30:
                 return CreateReturnStatement();
+
+            case 0x2B:
+                return CreateAsyncBlockStatement(operations, ref index);
 
             default:
                 return CreateMethodInvocationExpression(CreateName($"sub{operation.Command}"), operation);
@@ -107,6 +119,33 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new ReturnStatementSyntax(returnToken, null, semicolon);
+    }
+
+    private AsyncBlockStatement CreateAsyncBlockStatement(Sir0Operation[] operations, ref int index)
+    {
+        for (var i = index; i < operations.Length; i++)
+        {
+            if (operations[i].Command is not 0x2C)
+                continue;
+
+            SyntaxToken asyncToken = _syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
+            var asyncStatements = CreateAsyncBlockBody(operations[index..i]);
+
+            index = i + 1;
+
+            return new AsyncBlockStatement(asyncToken, asyncStatements);
+        }
+
+        throw new InvalidOperationException("Incomplete async block.");
+    }
+
+    private BlockExpression CreateAsyncBlockBody(Sir0Operation[] operations)
+    {
+        SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        var expressions = CreateStatements(operations);
+        SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+
+        return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
 
     private MethodInvocationStatementSyntax CreateMethodInvocationExpression(NameSyntax methodName, Sir0Operation operation)

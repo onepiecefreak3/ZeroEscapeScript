@@ -1,7 +1,7 @@
 ﻿using CrossCutting.Core.Contract.DependencyInjection;
 using CrossCutting.Core.Contract.DependencyInjection.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract;
-using Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 

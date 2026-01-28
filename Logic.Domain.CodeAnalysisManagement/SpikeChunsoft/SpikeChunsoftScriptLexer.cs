@@ -2,7 +2,7 @@
 using Logic.Domain.CodeAnalysisManagement.Contract;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions;
-using Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
@@ -557,6 +557,9 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
 
             case "yield":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.YieldKeyword, position, line, column, finalValue);
+
+            case "async":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AsyncKeyword, position, line, column, finalValue);
 
             case "return":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ReturnKeyword, position, line, column, finalValue);

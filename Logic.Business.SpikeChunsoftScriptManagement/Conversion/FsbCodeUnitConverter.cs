@@ -40,9 +40,15 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
         var operations = new List<Sir0Operation>();
 
         AddInitOperation(operations);
+        CreateOperations(operations, method.Body);
 
+        return [.. operations];
+    }
+
+    private void CreateOperations(List<Sir0Operation> operations, BlockExpression block)
+    {
         string? jumpLabel = null;
-        foreach (StatementSyntax statement in method.Body.Statements)
+        foreach (StatementSyntax statement in block.Statements)
         {
             switch (statement)
             {
@@ -57,6 +63,10 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
                     AddOperations(operations, methodInvocation, jumpLabel);
                     break;
 
+                case AsyncBlockStatement asyncStatement:
+                    AddAsyncOperations(operations, asyncStatement, jumpLabel);
+                    break;
+
                 case ReturnStatementSyntax:
                     AddReturnOperation(operations, jumpLabel);
                     break;
@@ -67,8 +77,6 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
 
             jumpLabel = null;
         }
-
-        return [.. operations];
     }
 
     private static void AddInitOperation(List<Sir0Operation> operations)
@@ -96,6 +104,23 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
         }
 
         operations.Add(new Sir0Operation(jumpLabel, operation, arguments));
+    }
+
+    private void AddAsyncOperations(List<Sir0Operation> operations, AsyncBlockStatement asyncStatement, string? jumpLabel)
+    {
+        AddAsyncStartOperation(operations, jumpLabel);
+        CreateOperations(operations, asyncStatement.Body);
+        AddAsyncEndOperation(operations, null);
+    }
+
+    private static void AddAsyncStartOperation(List<Sir0Operation> operations, string? jumpLabel)
+    {
+        operations.Add(new Sir0Operation(jumpLabel, 0x2B, [2]));
+    }
+
+    private static void AddAsyncEndOperation(List<Sir0Operation> operations, string? jumpLabel)
+    {
+        operations.Add(new Sir0Operation(jumpLabel, 0x2C, [2]));
     }
 
     private object GetArgument(LiteralExpressionSyntax literal)

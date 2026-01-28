@@ -5,7 +5,7 @@ using CrossCutting.Core.Contract.DependencyInjection.DataClasses;
 using CrossCutting.Core.Contract.EventBrokerage;
 using Logic.Domain.CodeAnalysisManagement.Contract;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
-using Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement;

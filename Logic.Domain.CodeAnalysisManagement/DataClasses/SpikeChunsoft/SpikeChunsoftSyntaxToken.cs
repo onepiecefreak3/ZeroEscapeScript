@@ -1,6 +1,6 @@
 ﻿using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
-namespace Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+namespace Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 public struct SpikeChunsoftSyntaxToken
 {

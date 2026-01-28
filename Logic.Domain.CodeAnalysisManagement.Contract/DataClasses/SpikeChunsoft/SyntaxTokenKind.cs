@@ -65,6 +65,7 @@ public enum SyntaxTokenKind
     NewKeyword,
     YieldKeyword,
     ReturnKeyword,
+    AsyncKeyword,
     ExitKeyword,
     NotKeyword,
     OrKeyword,

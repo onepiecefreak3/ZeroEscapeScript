@@ -65,6 +65,7 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
 
             case SyntaxTokenKind.YieldKeyword: return new("yield", (int)kind);
             case SyntaxTokenKind.ReturnKeyword: return new("return", (int)kind);
+            case SyntaxTokenKind.AsyncKeyword: return new("async", (int)kind);
             case SyntaxTokenKind.ExitKeyword: return new("exit", (int)kind);
             case SyntaxTokenKind.NewKeyword: return new("new", (int)kind);
             case SyntaxTokenKind.NotKeyword: return new("not", (int)kind);

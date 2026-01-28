@@ -1,4 +1,4 @@
-﻿namespace Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+﻿namespace Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 internal struct WhitespaceNormalizeContext
 {

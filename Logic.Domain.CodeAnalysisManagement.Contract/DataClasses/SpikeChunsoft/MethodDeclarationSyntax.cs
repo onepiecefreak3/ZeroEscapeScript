@@ -4,12 +4,12 @@ public class MethodDeclarationSyntax : SyntaxNode
 {
     public LiteralExpressionSyntax Name { get; private set; }
     public MethodDeclarationParametersSyntax Parameters { get; private set; }
-    public MethodDeclarationBodySyntax Body { get; private set; }
+    public BlockExpression Body { get; private set; }
 
     public override SyntaxLocation Location => Name.Location;
     public override SyntaxSpan Span => new(Name.Span.Position, Body.Span.EndPosition);
 
-    public MethodDeclarationSyntax(LiteralExpressionSyntax name, MethodDeclarationParametersSyntax parameters, MethodDeclarationBodySyntax body)
+    public MethodDeclarationSyntax(LiteralExpressionSyntax name, MethodDeclarationParametersSyntax parameters, BlockExpression body)
     {
         name.Parent = this;
         parameters.Parent = this;
@@ -40,7 +40,7 @@ public class MethodDeclarationSyntax : SyntaxNode
             Root.Update();
     }
 
-    public void SetBody(MethodDeclarationBodySyntax body, bool updatePosition = true)
+    public void SetBody(BlockExpression body, bool updatePosition = true)
     {
         body.Parent = this;
         Body = body;

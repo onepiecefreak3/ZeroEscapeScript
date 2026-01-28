@@ -57,7 +57,7 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
         ComposeLiteralExpression(valueList.Elements[^1], sb);
     }
 
-    private void ComposeMethodDeclarationBody(MethodDeclarationBodySyntax methodDeclarationBody, StringBuilder sb)
+    private void ComposeMethodDeclarationBody(BlockExpression methodDeclarationBody, StringBuilder sb)
     {
         ComposeSyntaxToken(methodDeclarationBody.CurlyOpen, sb);
 
@@ -75,6 +75,10 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
                 ComposeGotoLabelStatement(gotoStatement, sb);
                 break;
 
+            case AsyncBlockStatement asyncStatement:
+                ComposeAsyncBlockStatement(asyncStatement, sb);
+                break;
+
             case ReturnStatementSyntax returnStatement:
                 ComposeReturnStatement(returnStatement, sb);
                 break;
@@ -89,6 +93,22 @@ internal class SpikeChunsoftScriptComposer : ISpikeChunsoftScriptComposer
     {
         ComposeLiteralExpression(gotoLabelStatement.Label, sb);
         ComposeSyntaxToken(gotoLabelStatement.Colon, sb);
+    }
+
+    private void ComposeAsyncBlockStatement(AsyncBlockStatement asyncStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(asyncStatement.Async, sb);
+        ComposeAsyncBlockBody(asyncStatement.Body, sb);
+    }
+
+    private void ComposeAsyncBlockBody(BlockExpression blockExpression, StringBuilder sb)
+    {
+        ComposeSyntaxToken(blockExpression.CurlyOpen, sb);
+
+        foreach (StatementSyntax expression in blockExpression.Statements)
+            ComposeStatement(expression, sb);
+
+        ComposeSyntaxToken(blockExpression.CurlyClose, sb);
     }
 
     private void ComposeReturnStatement(ReturnStatementSyntax returnStatement, StringBuilder sb)

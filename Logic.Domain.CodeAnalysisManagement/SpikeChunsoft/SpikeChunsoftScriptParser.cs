@@ -3,7 +3,7 @@ using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions.Level5;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
-using Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
@@ -84,13 +84,13 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return new CommaSeparatedSyntaxList<LiteralExpressionSyntax>(result);
     }
 
-    private MethodDeclarationBodySyntax ParseMethodDeclarationBody(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    private BlockExpression ParseMethodDeclarationBody(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         SyntaxToken curlyOpenToken = ParseCurlyOpenToken(buffer);
         var expressions = ParseStatements(buffer);
         SyntaxToken curlyCloseToken = ParseCurlyCloseToken(buffer);
 
-        return new MethodDeclarationBodySyntax(curlyOpenToken, expressions, curlyCloseToken);
+        return new BlockExpression(curlyOpenToken, expressions, curlyCloseToken);
     }
 
     private IReadOnlyList<StatementSyntax> ParseStatements(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -107,6 +107,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     {
         return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword) ||
                IsMethodInvocation(buffer);
     }
 
@@ -123,6 +124,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         if (HasTokenKind(buffer, SyntaxTokenKind.StringLiteral))
             return ParseGotoLabelStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword))
+            return ParseAsyncBlockStatement(buffer);
 
         if (IsMethodInvocation(buffer))
             return ParseMethodInvocationStatement(buffer);
@@ -144,6 +148,23 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         SyntaxToken colon = ParseColonToken(buffer);
 
         return new GotoLabelStatementSyntax(identifier, colon);
+    }
+
+    private AsyncBlockStatement ParseAsyncBlockStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken asyncToken = ParseAsyncKeywordToken(buffer);
+        BlockExpression body = ParseAsyncBlockBody(buffer);
+
+        return new AsyncBlockStatement(asyncToken, body);
+    }
+
+    private BlockExpression ParseAsyncBlockBody(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken curlyOpenToken = ParseCurlyOpenToken(buffer);
+        var expressions = ParseStatements(buffer);
+        SyntaxToken curlyCloseToken = ParseCurlyCloseToken(buffer);
+
+        return new BlockExpression(curlyOpenToken, expressions, curlyCloseToken);
     }
 
     private MethodInvocationStatementSyntax ParseMethodInvocationStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -216,7 +237,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (HasTokenKind(buffer, SyntaxTokenKind.FloatingNumericLiteral))
             return ParseFloatingNumericLiteralExpression(buffer);
 
-        throw CreateException(buffer, "Unknown value expression.", SyntaxTokenKind.StringLiteral, SyntaxTokenKind.NumericLiteral, 
+        throw CreateException(buffer, "Unknown value expression.", SyntaxTokenKind.StringLiteral, SyntaxTokenKind.NumericLiteral,
             SyntaxTokenKind.FloatingNumericLiteral);
     }
 
@@ -293,6 +314,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseReturnKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.ReturnKeyword);
+    }
+
+    private SyntaxToken ParseAsyncKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.AsyncKeyword);
     }
 
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

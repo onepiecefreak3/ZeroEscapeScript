@@ -1,7 +1,7 @@
 ﻿using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
-using Logic.Domain.CodeAnalysisManagement.DataClasses.Level5;
+using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
 namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
@@ -67,7 +67,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         }
     }
 
-    private void NormalizeMethodDeclarationBody(MethodDeclarationBodySyntax methodDeclarationBody, WhitespaceNormalizeContext ctx)
+    private void NormalizeMethodDeclarationBody(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx)
     {
         SyntaxToken newCurlyOpen = methodDeclarationBody.CurlyOpen.WithLeadingTrivia(null).WithTrailingTrivia("\r\n");
         SyntaxToken newCurlyClose = methodDeclarationBody.CurlyClose.WithNoTrivia();
@@ -95,6 +95,10 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         {
             case GotoLabelStatementSyntax gotoStatement:
                 NormalizeGotoLabelStatement(gotoStatement, ctx);
+                break;
+
+            case AsyncBlockStatement asyncStatement:
+                NormalizeAsyncBlockStatement(asyncStatement, ctx);
                 break;
 
             case ReturnStatementSyntax returnStatement:
@@ -147,6 +151,41 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
         NormalizeLiteralExpression(returnStatement.Expression, ctx);
+    }
+
+    private void NormalizeAsyncBlockStatement(AsyncBlockStatement asyncBlock, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken asyncKeyword = asyncBlock.Async.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        asyncBlock.SetAsync(asyncKeyword, false);
+
+        NormalizeAsyncBlockBody(asyncBlock.Body, ctx);
+    }
+
+    private void NormalizeAsyncBlockBody(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken newCurlyOpen = methodDeclarationBody.CurlyOpen.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken newCurlyClose = methodDeclarationBody.CurlyClose.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+
+        methodDeclarationBody.SetCurlyOpen(newCurlyOpen, false);
+        methodDeclarationBody.SetCurlyClose(newCurlyClose, false);
+
+        ctx.Indent++;
+        foreach (StatementSyntax expression in methodDeclarationBody.Statements)
+        {
+            ctx.IsFirstElement = methodDeclarationBody.Statements[0] == expression;
+            ctx.ShouldLineBreak = true;
+            ctx.ShouldIndent = true;
+
+            NormalizeStatement(expression, ctx);
+        }
     }
 
     private void NormalizeMethodInvocationStatement(MethodInvocationStatementSyntax invocation, WhitespaceNormalizeContext ctx)

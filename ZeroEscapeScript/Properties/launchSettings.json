@@ -2,7 +2,7 @@
   "profiles": {
     "ZeroEscapeScript": {
       "commandName": "Project",
-      "commandLineArgs": "-o c -f E:\\reverse_engineering\\zero_escape_1\\ze1_usa\\ze1_usa_scripts\\scr\\a01.fsb.txt"
+      "commandLineArgs": "-o e -f E:\\reverse_engineering\\zero_escape_1\\ze1_usa\\ze1_usa_scripts\\scr\\a01.fsb.txt.fsb"
     }
   }
 }
