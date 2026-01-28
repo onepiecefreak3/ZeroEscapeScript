@@ -1,4 +1,5 @@
-﻿using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
+using Logic.Business.SpikeChunsoftScriptManagement.DataClasses.Conversion;
+using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
@@ -6,15 +7,8 @@ using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
 
-internal class FsbScriptFileConverter : IFsbScriptFileConverter
+internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory, IBlockBuilder blockBuilder) : IFsbScriptFileConverter
 {
-    private readonly ISpikeChunsoftSyntaxFactory _syntaxFactory;
-
-    public FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory)
-    {
-        _syntaxFactory = syntaxFactory;
-    }
-
     public CodeUnitSyntax CreateCodeUnit(Sir0Function[] functions)
     {
         IReadOnlyList<MethodDeclarationSyntax> methods = CreateMethodDeclarations(functions);
@@ -43,17 +37,17 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private MethodDeclarationParametersSyntax CreateMethodDeclarationParameters()
     {
-        SyntaxToken parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new MethodDeclarationParametersSyntax(parenOpen, null, parenClose);
     }
 
     private BlockExpression CreateMethodDeclarationBody(Sir0Function function)
     {
-        SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         var expressions = CreateStatements(function);
-        SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
@@ -65,20 +59,27 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
     {
+        IReadOnlyList<StatementBlock> blocks = blockBuilder.CreateStatementBlocks(operations);
         var result = new List<StatementSyntax>();
 
-        for (var i = 0; i < operations.Length;)
+        foreach (StatementBlock block in blocks)
         {
-            Sir0Operation operation = operations[i];
+            Sir0Operation[] blockOperations = [.. block.Operations];
 
-            if (operation.Label is not null)
-                result.Add(CreateGotoLabelStatement(operation.Label));
+            for (var index = 0; index < blockOperations.Length;)
+            {
+                Sir0Operation operation = blockOperations[index];
 
-            var statement = CreateStatement(operations, ref i);
-            if (statement is null)
-                continue;
+                if (operation.Label is not null)
+                    result.Add(CreateGotoLabelStatement(operation.Label));
 
-            result.Add(statement);
+                StatementSyntax? statement = CreateStatement(blockOperations, ref index);
+                if (statement is not null)
+                    result.Add(statement);
+
+                if (operation.Label is not null && index < blockOperations.Length && blockOperations[index] == operation)
+                    index++;
+            }
         }
 
         return result;
@@ -87,7 +88,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     private GotoLabelStatementSyntax CreateGotoLabelStatement(string label)
     {
         var labelLiteral = CreateStringLiteralExpression(label);
-        SyntaxToken colonToken = _syntaxFactory.Token(SyntaxTokenKind.Colon);
+        SyntaxToken colonToken = syntaxFactory.Token(SyntaxTokenKind.Colon);
 
         return new GotoLabelStatementSyntax(labelLiteral, colonToken);
     }
@@ -115,8 +116,8 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private ReturnStatementSyntax CreateReturnStatement()
     {
-        SyntaxToken returnToken = _syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
-        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken returnToken = syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new ReturnStatementSyntax(returnToken, null, semicolon);
     }
@@ -128,7 +129,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
             if (operations[i].Command is not 0x2C)
                 continue;
 
-            SyntaxToken asyncToken = _syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
+            SyntaxToken asyncToken = syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
             var asyncStatements = CreateAsyncBlockBody(operations[index..i]);
 
             index = i + 1;
@@ -141,9 +142,9 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private BlockExpression CreateAsyncBlockBody(Sir0Operation[] operations)
     {
-        SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         var expressions = CreateStatements(operations);
-        SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
@@ -151,16 +152,16 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     private MethodInvocationStatementSyntax CreateMethodInvocationExpression(NameSyntax methodName, Sir0Operation operation)
     {
         var parameters = CreateMethodInvocationExpressionParameters(operation);
-        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new MethodInvocationStatementSyntax(methodName, parameters, semicolon);
     }
 
     private MethodInvocationParametersSyntax CreateMethodInvocationExpressionParameters(Sir0Operation operation)
     {
-        SyntaxToken parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
         var parameterList = CreateValueList(operation);
-        SyntaxToken parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new MethodInvocationParametersSyntax(parenOpen, parameterList, parenClose);
     }
@@ -198,32 +199,32 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private LiteralExpressionSyntax CreateNumericLiteralExpression(int value)
     {
-        return new LiteralExpressionSyntax(_syntaxFactory.NumericLiteral(value));
+        return new LiteralExpressionSyntax(syntaxFactory.NumericLiteral(value));
     }
 
     private LiteralExpressionSyntax CreateFloatingNumericLiteralExpression(float value)
     {
-        return new LiteralExpressionSyntax(_syntaxFactory.FloatingNumericLiteral(value));
+        return new LiteralExpressionSyntax(syntaxFactory.FloatingNumericLiteral(value));
     }
 
     private LiteralExpressionSyntax CreateStringLiteralExpression(string value)
     {
-        return new LiteralExpressionSyntax(_syntaxFactory.StringLiteral(value));
+        return new LiteralExpressionSyntax(syntaxFactory.StringLiteral(value));
     }
 
     private NameSyntax CreateName(string name)
     {
         if (name.Contains('.'))
-            return new SimpleNameSyntax(_syntaxFactory.Identifier(name));
+            return new SimpleNameSyntax(syntaxFactory.Identifier(name));
 
         NameSyntax? result = null;
 
         foreach (string part in name.Split('.').Reverse())
         {
             if (result is null)
-                result = new SimpleNameSyntax(_syntaxFactory.Identifier(part));
+                result = new SimpleNameSyntax(syntaxFactory.Identifier(part));
             else
-                result = new QualifiedNameSyntax(new SimpleNameSyntax(_syntaxFactory.Identifier(part)), _syntaxFactory.Token(SyntaxTokenKind.Dot), result);
+                result = new QualifiedNameSyntax(new SimpleNameSyntax(syntaxFactory.Identifier(part)), syntaxFactory.Token(SyntaxTokenKind.Dot), result);
         }
 
         return result!;

@@ -1,8 +1,8 @@
-﻿using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
+﻿using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.DataClasses.Conversion;
 
-class StatementBlock
+internal class StatementBlock
 {
     public IList<StatementBlock> Parents { get; set; } = [];
 
@@ -14,5 +14,5 @@ class StatementBlock
 
     public HashSet<string> Labels { get; set; } = [];
 
-    public IList<StatementSyntax> Statements { get; set; } = [];
+    public IList<Sir0Operation> Operations { get; set; } = [];
 }

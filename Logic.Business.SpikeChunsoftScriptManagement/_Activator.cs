@@ -43,8 +43,8 @@ public class SpikeChunsoftScriptManagementActivator : IComponentActivator
         kernel.Register<ICreateFsbWorkflow, CreateFsbWorkflow>(ActivationScope.Unique);
 
         kernel.Register<IFsbScriptFileConverter, FsbScriptFileConverter>(ActivationScope.Unique);
-
         kernel.Register<IFsbCodeUnitConverter, FsbCodeUnitConverter>(ActivationScope.Unique);
+        kernel.Register<IBlockBuilder, BlockBuilder>(ActivationScope.Unique);
 
         kernel.Register<ISpikeChunsoftScriptManagementConfigurationValidator, SpikeChunsoftScriptManagementConfigurationValidator>(ActivationScope.Unique);
 

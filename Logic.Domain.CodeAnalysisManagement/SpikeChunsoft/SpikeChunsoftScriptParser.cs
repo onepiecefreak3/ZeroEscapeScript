@@ -1,7 +1,7 @@
 ﻿using Logic.Domain.CodeAnalysisManagement.Contract;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
-using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions.Level5;
+using Logic.Domain.CodeAnalysisManagement.Contract.Exceptions.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.DataClasses.SpikeChunsoft;
 
@@ -438,6 +438,6 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
                 $"{message} (Expected any of {string.Join(", ", expected)})";
         }
 
-        throw new Level5ScriptParserException(message, line, column);
+        throw new SpikeChunsoftScriptParserException(message, line, column);
     }
 }
