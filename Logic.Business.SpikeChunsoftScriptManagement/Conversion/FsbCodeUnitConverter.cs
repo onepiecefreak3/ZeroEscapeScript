@@ -192,7 +192,7 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
         _loopContextStack.Push(loopContext);
 
         string? danglingLabel = CreateOperationsInternal(operations, doWhileStatement.Body, startLabel);
-        AddConditionalJumpOnTrue(operations, danglingLabel, startLabel);
+        AddGotoOperation(operations, danglingLabel, startLabel);
 
         _loopContextStack.Pop();
         return loopContext.BreakUsed ? breakLabel : null;
