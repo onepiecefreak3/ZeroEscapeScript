@@ -60,7 +60,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
     {
-        IReadOnlyList<StatementBlock> blocks = blockBuilder.CreateStatementBlocks(operations);
+        IReadOnlyList<StatementBlock> blocks = blockBuilder.Build(operations);
         return CreateStatements(blocks);
     }
 
@@ -180,6 +180,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return new LiteralExpressionSyntax(syntaxFactory.StringLiteral(value));
     }
 
+    private LiteralExpressionSyntax CreateTrueLiteralExpression()
+    {
+        return new LiteralExpressionSyntax(syntaxFactory.Token(SyntaxTokenKind.TrueKeyword));
+    }
+
     private NameSyntax CreateName(string name)
     {
         if (name.Contains('.'))
@@ -203,13 +208,13 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         if (blocks.Count == 0)
             return [];
 
-        IReadOnlyDictionary<string, int> labelLookup = CreateLabelLookup(blocks);
-        Dictionary<int, int> loopBounds = CreateLoopBounds(blocks, labelLookup);
+        Dictionary<string, int> labelLookup = CreateLabelLookup(blocks);
+        Dictionary<int, LoopBound> loopBounds = CreateLoopBounds(blocks, labelLookup);
 
         return BuildStatementsRange(blocks, labelLookup, loopBounds, 0, blocks.Count);
     }
 
-    private IReadOnlyDictionary<string, int> CreateLabelLookup(IReadOnlyList<StatementBlock> blocks)
+    private Dictionary<string, int> CreateLabelLookup(IReadOnlyList<StatementBlock> blocks)
     {
         var result = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var i = 0; i < blocks.Count; i++)
@@ -224,9 +229,9 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return result;
     }
 
-    private Dictionary<int, int> CreateLoopBounds(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup)
+    private Dictionary<int, LoopBound> CreateLoopBounds(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup)
     {
-        var result = new Dictionary<int, int>();
+        var result = new Dictionary<int, LoopBound>();
         for (var i = 0; i < blocks.Count; i++)
         {
             StatementBlock block = blocks[i];
@@ -239,27 +244,36 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             if (targetIndex > i)
                 continue;
 
-            result.TryAdd(targetIndex, i);
+            LoopConditionKind conditionKind = block.TerminalCommand switch
+            {
+                0x35 => LoopConditionKind.True,
+                0x36 => LoopConditionKind.Not,
+                0x37 => LoopConditionKind.Normal,
+                _ => throw new InvalidOperationException($"Unknown terminal command 0x{block.TerminalCommand:X00}.")
+            };
+
+            _ = result.TryAdd(targetIndex, new LoopBound(i, conditionKind));
         }
 
         return result;
     }
 
     private IReadOnlyList<StatementSyntax> BuildStatementsRange(IReadOnlyList<StatementBlock> blocks,
-        IReadOnlyDictionary<string, int> labelLookup, Dictionary<int, int> loopBounds, int startIndex, int endIndex,
+        Dictionary<string, int> labelLookup, Dictionary<int, LoopBound> loopBounds, int startIndex, int endIndex,
         bool skipLoopStart = false, LoopContext? loopContext = null)
     {
         var result = new List<StatementSyntax>();
         for (var i = startIndex; i < endIndex;)
         {
-            if (!skipLoopStart && loopBounds.TryGetValue(i, out int loopEnd) && loopEnd < endIndex)
+            if (!skipLoopStart && loopBounds.TryGetValue(i, out LoopBound? loopBound) && loopBound.EndIndex < endIndex)
             {
-                int exitIndex = Math.Min(loopEnd + 1, blocks.Count);
-                var nestedContext = new LoopContext(i, loopEnd, exitIndex);
-                IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, i, loopEnd + 1, true,
+                int exitIndex = Math.Min(loopBound.EndIndex + 1, blocks.Count);
+                var nestedContext = new LoopContext(i, loopBound.EndIndex, exitIndex);
+                IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, i,
+                    loopBound.EndIndex + 1, true,
                     nestedContext);
-                result.Add(CreateDoWhileStatement(bodyStatements));
-                i = loopEnd + 1;
+                result.Add(CreateLoopStatement(loopBound.ConditionKind, bodyStatements));
+                i = loopBound.EndIndex + 1;
                 continue;
             }
 
@@ -281,8 +295,8 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return result;
     }
 
-    private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int index, int endIndex, LoopContext? loopContext,
+    private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
+        Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext,
         [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
@@ -302,7 +316,8 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         {
             int thenStart = index + 1;
             int thenEnd = targetIndex;
-            if (TryBuildIfElseOnFalse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, loopContext, out statement, out nextIndex))
+            if (TryBuildIfElseOnFalse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, loopContext, out statement,
+                    out nextIndex))
                 return true;
 
             IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, false,
@@ -314,15 +329,18 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
         int elseStart = index + 1;
         int elseEnd = targetIndex;
-        if (!TryBuildIfElseOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, loopContext, out statement,
-                out nextIndex))
-            return false;
+        if (TryBuildIfElseOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, loopContext, out statement, out nextIndex))
+            return true;
 
+        IReadOnlyList<StatementSyntax> notStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, false,
+            loopContext);
+        statement = CreateIfNotStatement(notStatements);
+        nextIndex = targetIndex;
         return true;
     }
 
-    private bool TryBuildIfElseOnFalse(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int thenStart, int thenEnd, int targetIndex, LoopContext? loopContext,
+    private bool TryBuildIfElseOnFalse(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
+        Dictionary<int, LoopBound> loopBounds, int thenStart, int thenEnd, int targetIndex, LoopContext? loopContext,
         [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
@@ -351,8 +369,8 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return true;
     }
 
-    private bool TryBuildIfElseOnTrue(IReadOnlyList<StatementBlock> blocks, IReadOnlyDictionary<string, int> labelLookup,
-        Dictionary<int, int> loopBounds, int elseStart, int elseEnd, int targetIndex, LoopContext? loopContext,
+    private bool TryBuildIfElseOnTrue(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
+        Dictionary<int, LoopBound> loopBounds, int elseStart, int elseEnd, int targetIndex, LoopContext? loopContext,
         [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
@@ -368,15 +386,15 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         if (!labelLookup.TryGetValue(endElseBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
             return false;
 
-        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, false,
+        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, false,
             loopContext);
-        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, false,
+        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, false,
             loopContext);
 
         if (elseStatements.Count <= 0)
             return false;
 
-        statement = CreateIfElseStatement(thenStatements, elseStatements);
+        statement = CreateIfNotElseStatement(thenStatements, elseStatements);
         nextIndex = endIndex;
         return true;
     }
@@ -418,9 +436,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
                 continue;
             }
 
-            StatementSyntax? statement = CreateStatement(blockOperations, ref index);
-            if (statement is not null)
-                result.Add(statement);
+            result.Add(CreateStatement(blockOperations, ref index));
         }
 
         return result;
@@ -450,6 +466,33 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
     }
 
+    private IfNotStatementSyntax CreateIfNotStatement(IReadOnlyList<StatementSyntax> thenStatements)
+    {
+        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
+        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        LiteralExpressionSyntax condition = CreateConditionExpression();
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        BlockExpression body = CreateBlockExpression(thenStatements);
+
+        return new IfNotStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body);
+    }
+
+    private IfNotElseStatementSyntax CreateIfNotElseStatement(IReadOnlyList<StatementSyntax> thenStatements,
+        IReadOnlyList<StatementSyntax> elseStatements)
+    {
+        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
+        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        LiteralExpressionSyntax condition = CreateConditionExpression();
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        BlockExpression body = CreateBlockExpression(thenStatements);
+        SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
+        BlockExpression elseBody = CreateBlockExpression(elseStatements);
+
+        return new IfNotElseStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+    }
+
     private DoWhileStatementSyntax CreateDoWhileStatement(IReadOnlyList<StatementSyntax> bodyStatements)
     {
         SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
@@ -463,9 +506,45 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
     }
 
+    private DoWhileStatementSyntax CreateDoWhileStatement(IReadOnlyList<StatementSyntax> bodyStatements, LiteralExpressionSyntax condition)
+    {
+        SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
+        BlockExpression body = CreateBlockExpression(bodyStatements);
+        SyntaxToken whileToken = syntaxFactory.Token(SyntaxTokenKind.WhileKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
+    }
+
+    private DoWhileNotStatementSyntax CreateDoWhileNotStatement(IReadOnlyList<StatementSyntax> bodyStatements, LiteralExpressionSyntax condition)
+    {
+        SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
+        BlockExpression body = CreateBlockExpression(bodyStatements);
+        SyntaxToken whileToken = syntaxFactory.Token(SyntaxTokenKind.WhileKeyword);
+        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new DoWhileNotStatementSyntax(doToken, body, whileToken, notToken, parenOpen, condition, parenClose, semicolon);
+    }
+
     private LiteralExpressionSyntax CreateConditionExpression()
     {
         return CreateNumericLiteralExpression(1);
+    }
+
+    private StatementSyntax CreateLoopStatement(LoopConditionKind conditionKind, IReadOnlyList<StatementSyntax> bodyStatements)
+    {
+        return conditionKind switch
+        {
+            LoopConditionKind.Not => CreateDoWhileNotStatement(bodyStatements, CreateConditionExpression()),
+            LoopConditionKind.True => CreateDoWhileStatement(bodyStatements, CreateTrueLiteralExpression()),
+            LoopConditionKind.Normal => CreateDoWhileStatement(bodyStatements),
+            _ => throw new InvalidOperationException($"Unknown loop condition {conditionKind}.")
+        };
     }
 
     private BlockExpression CreateBlockExpression(IReadOnlyList<StatementSyntax> statements)
@@ -514,6 +593,15 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     }
 
     private sealed record LoopContext(int StartIndex, int EndIndex, int ExitIndex);
+
+    private sealed record LoopBound(int EndIndex, LoopConditionKind ConditionKind);
+
+    private enum LoopConditionKind
+    {
+        Normal,
+        Not,
+        True
+    }
 
     private enum LoopControlKind
     {

@@ -61,6 +61,8 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
             case SyntaxTokenKind.CurlyOpen: return new("{", (int)kind);
             case SyntaxTokenKind.CurlyClose: return new("}", (int)kind);
 
+            case SyntaxTokenKind.TrueKeyword: return new("true", (int)kind);
+            case SyntaxTokenKind.FalseKeyword: return new("false", (int)kind);
             case SyntaxTokenKind.ReturnKeyword: return new("return", (int)kind);
             case SyntaxTokenKind.AsyncKeyword: return new("async", (int)kind);
             case SyntaxTokenKind.IfKeyword: return new("if", (int)kind);

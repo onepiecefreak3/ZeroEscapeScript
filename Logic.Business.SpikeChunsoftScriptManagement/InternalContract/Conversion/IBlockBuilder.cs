@@ -5,5 +5,5 @@ namespace Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversi
 
 internal interface IBlockBuilder
 {
-    IReadOnlyList<StatementBlock> CreateStatementBlocks(Sir0Operation[] operations);
+    IReadOnlyList<StatementBlock> Build(Sir0Operation[] operations);
 }

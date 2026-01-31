@@ -76,8 +76,20 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
                 ComposeIfElseStatement(ifElseStatement, sb);
                 break;
 
+            case IfNotStatementSyntax ifNotStatement:
+                ComposeIfNotStatement(ifNotStatement, sb);
+                break;
+
+            case IfNotElseStatementSyntax ifNotElseStatement:
+                ComposeIfNotElseStatement(ifNotElseStatement, sb);
+                break;
+
             case DoWhileStatementSyntax doWhileStatement:
                 ComposeDoWhileStatement(doWhileStatement, sb);
+                break;
+
+            case DoWhileNotStatementSyntax doWhileNotStatement:
+                ComposeDoWhileNotStatement(doWhileNotStatement, sb);
                 break;
 
             case BreakStatementSyntax breakStatement:
@@ -134,6 +146,28 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeBlock(ifElseStatement.ElseBody, sb);
     }
 
+    private void ComposeIfNotStatement(IfNotStatementSyntax ifNotStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(ifNotStatement.If, sb);
+        ComposeSyntaxToken(ifNotStatement.Not, sb);
+        ComposeSyntaxToken(ifNotStatement.ParenOpen, sb);
+        ComposeLiteralExpression(ifNotStatement.Condition, sb);
+        ComposeSyntaxToken(ifNotStatement.ParenClose, sb);
+        ComposeBlock(ifNotStatement.Body, sb);
+    }
+
+    private void ComposeIfNotElseStatement(IfNotElseStatementSyntax ifNotElseStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(ifNotElseStatement.If, sb);
+        ComposeSyntaxToken(ifNotElseStatement.Not, sb);
+        ComposeSyntaxToken(ifNotElseStatement.ParenOpen, sb);
+        ComposeLiteralExpression(ifNotElseStatement.Condition, sb);
+        ComposeSyntaxToken(ifNotElseStatement.ParenClose, sb);
+        ComposeBlock(ifNotElseStatement.Body, sb);
+        ComposeSyntaxToken(ifNotElseStatement.Else, sb);
+        ComposeBlock(ifNotElseStatement.ElseBody, sb);
+    }
+
     private void ComposeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, StringBuilder sb)
     {
         ComposeSyntaxToken(doWhileStatement.Do, sb);
@@ -143,6 +177,18 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeLiteralExpression(doWhileStatement.Condition, sb);
         ComposeSyntaxToken(doWhileStatement.ParenClose, sb);
         ComposeSyntaxToken(doWhileStatement.Semicolon, sb);
+    }
+
+    private void ComposeDoWhileNotStatement(DoWhileNotStatementSyntax doWhileNotStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(doWhileNotStatement.Do, sb);
+        ComposeBlock(doWhileNotStatement.Body, sb);
+        ComposeSyntaxToken(doWhileNotStatement.While, sb);
+        ComposeSyntaxToken(doWhileNotStatement.Not, sb);
+        ComposeSyntaxToken(doWhileNotStatement.ParenOpen, sb);
+        ComposeLiteralExpression(doWhileNotStatement.Condition, sb);
+        ComposeSyntaxToken(doWhileNotStatement.ParenClose, sb);
+        ComposeSyntaxToken(doWhileNotStatement.Semicolon, sb);
     }
 
     private void ComposeBreakStatement(BreakStatementSyntax breakStatement, StringBuilder sb)

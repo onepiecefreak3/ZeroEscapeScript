@@ -177,18 +177,29 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private StatementSyntax ParseIfStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         SyntaxToken ifToken = ParseIfKeywordToken(buffer);
+        SyntaxToken? notToken = null;
+        if (HasTokenKind(buffer, SyntaxTokenKind.NotKeyword))
+            notToken = ParseNotKeywordToken(buffer);
         SyntaxToken parenOpen = ParseParenOpenToken(buffer);
         LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
         SyntaxToken parenClose = ParseParenCloseToken(buffer);
         BlockExpression body = ParseBlockExpression(buffer);
 
         if (!HasTokenKind(buffer, SyntaxTokenKind.ElseKeyword))
-            return new IfStatementSyntax(ifToken, parenOpen, condition, parenClose, body);
+        {
+            if (notToken is null)
+                return new IfStatementSyntax(ifToken, parenOpen, condition, parenClose, body);
+
+            return new IfNotStatementSyntax(ifToken, notToken.Value, parenOpen, condition, parenClose, body);
+        }
 
         SyntaxToken elseToken = ParseElseKeywordToken(buffer);
         BlockExpression elseBody = ParseBlockExpression(buffer);
 
-        return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+        if (notToken is null)
+            return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+
+        return new IfNotElseStatementSyntax(ifToken, notToken.Value, parenOpen, condition, parenClose, body, elseToken, elseBody);
     }
 
     private StatementSyntax ParseDoWhileStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -196,12 +207,18 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         SyntaxToken doToken = ParseDoKeywordToken(buffer);
         BlockExpression body = ParseBlockExpression(buffer);
         SyntaxToken whileToken = ParseWhileKeywordToken(buffer);
+        SyntaxToken? notToken = null;
+        if (HasTokenKind(buffer, SyntaxTokenKind.NotKeyword))
+            notToken = ParseNotKeywordToken(buffer);
         SyntaxToken parenOpen = ParseParenOpenToken(buffer);
         LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
         SyntaxToken parenClose = ParseParenCloseToken(buffer);
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
-        return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
+        if (notToken is null)
+            return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
+
+        return new DoWhileNotStatementSyntax(doToken, body, whileToken, notToken.Value, parenOpen, condition, parenClose, semicolon);
     }
 
     private StatementSyntax ParseBreakStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -289,7 +306,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private bool IsLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
+        return HasTokenKind(buffer, SyntaxTokenKind.TrueKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.FalseKeyword) || 
+               HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.NumericLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.UnsignedNumericLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.HashStringLiteral) ||
@@ -299,6 +318,12 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private LiteralExpressionSyntax ParseLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
+        if (HasTokenKind(buffer, SyntaxTokenKind.TrueKeyword))
+            return ParseTrueLiteralExpression(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.FalseKeyword))
+            return ParseFalseLiteralExpression(buffer);
+
         if (HasTokenKind(buffer, SyntaxTokenKind.StringLiteral))
             return ParseStringLiteralExpression(buffer);
 
@@ -310,6 +335,20 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         throw CreateException(buffer, "Unknown value expression.", SyntaxTokenKind.StringLiteral, SyntaxTokenKind.NumericLiteral,
             SyntaxTokenKind.FloatingNumericLiteral);
+    }
+
+    private LiteralExpressionSyntax ParseTrueLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken literal = ParseTrueKeywordToken(buffer);
+
+        return new LiteralExpressionSyntax(literal);
+    }
+
+    private LiteralExpressionSyntax ParseFalseLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken literal = ParseFalseKeywordToken(buffer);
+
+        return new LiteralExpressionSyntax(literal);
     }
 
     private LiteralExpressionSyntax ParseStringLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -397,6 +436,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return CreateToken(buffer, SyntaxTokenKind.IfKeyword);
     }
 
+    private SyntaxToken ParseNotKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.NotKeyword);
+    }
+
     private SyntaxToken ParseElseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.ElseKeyword);
@@ -435,6 +479,16 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseStringLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.StringLiteral);
+    }
+
+    private SyntaxToken ParseTrueKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.TrueKeyword);
+    }
+
+    private SyntaxToken ParseFalseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.FalseKeyword);
     }
 
     private SyntaxToken ParseIdentifierToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

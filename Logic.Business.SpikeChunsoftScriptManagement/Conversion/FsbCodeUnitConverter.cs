@@ -50,7 +50,7 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
     private void CreateOperations(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel = null)
     {
         string? jumpLabel = CreateOperationsInternal(operations, block, leadingLabel);
-        
+
         if (jumpLabel is not null)
             BackPropagateJumpLabel(operations, jumpLabel);
     }
@@ -86,8 +86,20 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
                     nextLabel = AddIfElseOperations(operations, ifElseStatement, jumpLabel);
                     break;
 
+                case IfNotStatementSyntax ifNotStatement:
+                    nextLabel = AddIfNotOperations(operations, ifNotStatement, jumpLabel);
+                    break;
+
+                case IfNotElseStatementSyntax ifNotElseStatement:
+                    nextLabel = AddIfNotElseOperations(operations, ifNotElseStatement, jumpLabel);
+                    break;
+
                 case DoWhileStatementSyntax doWhileStatement:
                     nextLabel = AddDoWhileOperations(operations, doWhileStatement, jumpLabel);
+                    break;
+
+                case DoWhileNotStatementSyntax doWhileNotStatement:
+                    nextLabel = AddDoWhileNotOperations(operations, doWhileNotStatement, jumpLabel);
                     break;
 
                 case BreakStatementSyntax:
@@ -184,17 +196,82 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
         return endLabel;
     }
 
+    private string AddIfNotOperations(List<Sir0Operation> operations, IfNotStatementSyntax ifNotStatement, string? jumpLabel)
+    {
+        string endLabel = CreateLabel();
+
+        int conditionIndex = operations.Count;
+        AddConditionalJumpOnTrue(operations, jumpLabel, endLabel);
+
+        string? danglingLabel = CreateOperationsInternal(operations, ifNotStatement.Body, null);
+        if (danglingLabel is not null)
+        {
+            UpdateJumpTarget(operations, conditionIndex, danglingLabel);
+            endLabel = danglingLabel;
+        }
+
+        return endLabel;
+    }
+
+    private string AddIfNotElseOperations(List<Sir0Operation> operations, IfNotElseStatementSyntax ifNotElseStatement, string? jumpLabel)
+    {
+        string elseLabel = CreateLabel();
+        string endLabel = CreateLabel();
+
+        AddConditionalJumpOnTrue(operations, jumpLabel, elseLabel);
+
+        string? danglingThenLabel = CreateOperationsInternal(operations, ifNotElseStatement.Body, null);
+        int gotoIndex = operations.Count;
+        AddGotoOperation(operations, danglingThenLabel, endLabel);
+
+        string? danglingElseLabel = CreateOperationsInternal(operations, ifNotElseStatement.ElseBody, elseLabel);
+        if (danglingElseLabel is not null)
+        {
+            UpdateJumpTarget(operations, gotoIndex, danglingElseLabel);
+            endLabel = danglingElseLabel;
+        }
+
+        return endLabel;
+    }
+
     private string? AddDoWhileOperations(List<Sir0Operation> operations, DoWhileStatementSyntax doWhileStatement, string? jumpLabel)
+    {
+        string startLabel = jumpLabel ?? CreateLabel();
+        string breakLabel = CreateLabel();
+
+        var loopContext = new LoopEmissionContext(startLabel, breakLabel);
+        _loopContextStack.Push(loopContext);
+
+        string? danglingLabel = CreateOperationsInternal(operations, doWhileStatement.Body, startLabel);
+
+        // HINT: "while (false)" is emitted as no additional operations
+        if (doWhileStatement.Condition.Literal.RawKind == (int)SyntaxTokenKind.TrueKeyword)
+            AddGotoOperation(operations, danglingLabel, startLabel);
+        else if (doWhileStatement.Condition.Literal.RawKind != (int)SyntaxTokenKind.FalseKeyword)
+            AddConditionalJumpOnTrue(operations, danglingLabel, startLabel);
+
+        _loopContextStack.Pop();
+
+        return loopContext.BreakUsed ? breakLabel : null;
+    }
+
+    private string? AddDoWhileNotOperations(List<Sir0Operation> operations, DoWhileNotStatementSyntax doWhileNotStatement, string? jumpLabel)
     {
         string startLabel = jumpLabel ?? CreateLabel();
         string breakLabel = CreateLabel();
         var loopContext = new LoopEmissionContext(startLabel, breakLabel);
         _loopContextStack.Push(loopContext);
 
-        string? danglingLabel = CreateOperationsInternal(operations, doWhileStatement.Body, startLabel);
-        AddGotoOperation(operations, danglingLabel, startLabel);
+        string? danglingLabel = CreateOperationsInternal(operations, doWhileNotStatement.Body, startLabel);
+
+        // HINT: "while not (true)" is emitted as no additional operations
+        if (doWhileNotStatement.Condition.Literal.RawKind == (int)SyntaxTokenKind.FalseKeyword)
+            AddGotoOperation(operations, danglingLabel, startLabel);
+        else if (doWhileNotStatement.Condition.Literal.RawKind != (int)SyntaxTokenKind.TrueKeyword)
+            AddConditionalJumpOnFalse(operations, danglingLabel, startLabel);
 
         _loopContextStack.Pop();
+
         return loopContext.BreakUsed ? breakLabel : null;
     }
 

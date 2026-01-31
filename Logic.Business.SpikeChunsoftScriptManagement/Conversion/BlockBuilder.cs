@@ -6,7 +6,7 @@ namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
 
 internal class BlockBuilder : IBlockBuilder
 {
-    public IReadOnlyList<StatementBlock> CreateStatementBlocks(Sir0Operation[] operations)
+    public IReadOnlyList<StatementBlock> Build(Sir0Operation[] operations)
     {
         List<StatementBlock> blocks = CreateBlocks(operations, out List<BlockInfo> blockInfos);
         RelateBlocks(blockInfos);
@@ -37,12 +37,12 @@ internal class BlockBuilder : IBlockBuilder
 
                 EnsureBlock(ref currentBlock, ref currentInfo, blocks, blockInfos, index);
 
-                currentBlock.Labels.Add(operation.Label);
+                currentBlock!.Labels.Add(operation.Label);
             }
 
             EnsureBlock(ref currentBlock, ref currentInfo, blocks, blockInfos, index);
 
-            currentBlock.Operations.Add(operation);
+            currentBlock!.Operations.Add(operation);
 
             if (!IsBlockTerminator(operation.Command))
                 continue;
@@ -51,6 +51,7 @@ internal class BlockBuilder : IBlockBuilder
             currentInfo.JumpLabel = GetJumpLabel(operation);
             currentBlock.TerminalCommand = currentInfo.TerminalCommand;
             currentBlock.JumpLabel = currentInfo.JumpLabel;
+
             currentBlock = null;
             currentInfo = null;
         }
@@ -147,7 +148,7 @@ internal class BlockBuilder : IBlockBuilder
 
     private static string? GetJumpLabel(Sir0Operation operation)
     {
-        if (operation.Command is not (0x35 or 0x36 or 0x37))
+        if (operation.Command is not 0x35 and not 0x36 and not 0x37)
             return null;
 
         if (operation.Arguments.Length <= 0 || operation.Arguments[0] is not string jumpLabel)

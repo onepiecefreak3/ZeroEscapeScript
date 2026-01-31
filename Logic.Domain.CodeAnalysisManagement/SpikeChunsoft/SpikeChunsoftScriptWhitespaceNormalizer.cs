@@ -105,8 +105,20 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeIfElseStatement(ifElseStatement, ctx);
                 break;
 
+            case IfNotStatementSyntax ifNotStatement:
+                NormalizeIfNotStatement(ifNotStatement, ctx);
+                break;
+
+            case IfNotElseStatementSyntax ifNotElseStatement:
+                NormalizeIfNotElseStatement(ifNotElseStatement, ctx);
+                break;
+
             case DoWhileStatementSyntax doWhileStatement:
                 NormalizeDoWhileStatement(doWhileStatement, ctx);
+                break;
+
+            case DoWhileNotStatementSyntax doWhileNotStatement:
+                NormalizeDoWhileNotStatement(doWhileNotStatement, ctx);
                 break;
 
             case BreakStatementSyntax breakStatement:
@@ -212,6 +224,57 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         NormalizeLiteralExpression(ifElseStatement.Condition, ctx);
     }
 
+    private void NormalizeIfNotStatement(IfNotStatementSyntax ifNotStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken ifToken = ifNotStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken notToken = ifNotStatement.Not.WithNoTrivia().WithTrailingTrivia(" ");
+        SyntaxToken parenOpen = ifNotStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = ifNotStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
+
+        ifNotStatement.SetIf(ifToken, false);
+        ifNotStatement.SetNot(notToken, false);
+        ifNotStatement.SetParenOpen(parenOpen, false);
+        ifNotStatement.SetParenClose(parenClose, false);
+
+        NormalizeBlock(ifNotStatement.Body, ctx, "\r\n");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(ifNotStatement.Condition, ctx);
+    }
+
+    private void NormalizeIfNotElseStatement(IfNotElseStatementSyntax ifNotElseStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken ifToken = ifNotElseStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken notToken = ifNotElseStatement.Not.WithNoTrivia().WithTrailingTrivia(" ");
+        SyntaxToken elseToken = ifNotElseStatement.Else.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken parenOpen = ifNotElseStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = ifNotElseStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
+
+        ifNotElseStatement.SetIf(ifToken, false);
+        ifNotElseStatement.SetNot(notToken, false);
+        ifNotElseStatement.SetElse(elseToken, false);
+        ifNotElseStatement.SetParenOpen(parenOpen, false);
+        ifNotElseStatement.SetParenClose(parenClose, false);
+
+        NormalizeBlock(ifNotElseStatement.Body, ctx, "\r\n");
+        NormalizeBlock(ifNotElseStatement.ElseBody, ctx, "\r\n");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(ifNotElseStatement.Condition, ctx);
+    }
+
     private void NormalizeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, WhitespaceNormalizeContext ctx)
     {
         string? leadingTrivia = null;
@@ -239,6 +302,37 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
         NormalizeLiteralExpression(doWhileStatement.Condition, ctx);
+    }
+
+    private void NormalizeDoWhileNotStatement(DoWhileNotStatementSyntax doWhileNotStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken doToken = doWhileNotStatement.Do.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken whileToken = doWhileNotStatement.While.WithNoTrivia().WithTrailingTrivia(" ");
+        SyntaxToken notToken = doWhileNotStatement.Not.WithNoTrivia().WithTrailingTrivia(" ");
+        SyntaxToken parenOpen = doWhileNotStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = doWhileNotStatement.ParenClose.WithNoTrivia();
+        SyntaxToken semicolon = doWhileNotStatement.Semicolon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            semicolon = semicolon.WithTrailingTrivia("\r\n");
+
+        doWhileNotStatement.SetWhile(whileToken, false);
+        doWhileNotStatement.SetNot(notToken, false);
+        doWhileNotStatement.SetParenOpen(parenOpen, false);
+        doWhileNotStatement.SetParenClose(parenClose, false);
+        doWhileNotStatement.SetDo(doToken, false);
+        doWhileNotStatement.SetSemicolon(semicolon, false);
+
+        NormalizeBlock(doWhileNotStatement.Body, ctx, " ");
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(doWhileNotStatement.Condition, ctx);
     }
 
     private void NormalizeBreakStatement(BreakStatementSyntax breakStatement, WhitespaceNormalizeContext ctx)

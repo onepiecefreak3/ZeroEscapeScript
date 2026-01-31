@@ -555,6 +555,12 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case "_":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Underscore, position, line, column, finalValue);
 
+            case "true":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.TrueKeyword, position, line, column, finalValue);
+
+            case "false":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.FalseKeyword, position, line, column, finalValue);
+
             case "yield":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.YieldKeyword, position, line, column, finalValue);
 
