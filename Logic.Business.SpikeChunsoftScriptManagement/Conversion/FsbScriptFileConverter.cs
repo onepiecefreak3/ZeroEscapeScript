@@ -70,7 +70,6 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
         switch (operation.Command)
         {
-            case 0x26:
             case 0x30:
                 return CreateReturnStatement();
 
@@ -430,7 +429,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
         for (var index = 0; index < endIndex;)
         {
-            if (blockOperations[index].Command is 0x25 or 0x35 or 0x36 or 0x37)
+            if (blockOperations[index].Command is 0x25 or 0x26 or 0x35 or 0x36 or 0x37)
             {
                 index++;
                 continue;

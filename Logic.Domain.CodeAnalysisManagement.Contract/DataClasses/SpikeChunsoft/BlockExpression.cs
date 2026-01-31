@@ -33,7 +33,7 @@ public class BlockExpression : SyntaxNode
             Root.Update();
     }
 
-    public void SetExpressions(IReadOnlyList<StatementSyntax> expressions, bool updatePosition = true)
+    public void SetStatements(IReadOnlyList<StatementSyntax> expressions, bool updatePosition = true)
     {
         Statements = expressions;
         foreach (StatementSyntax expression in Statements)

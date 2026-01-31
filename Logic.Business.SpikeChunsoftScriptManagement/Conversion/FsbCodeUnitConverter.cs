@@ -1,13 +1,14 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
+using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
 
-internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
+internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) : IFsbCodeUnitConverter
 {
     private readonly Regex _subPattern = new("^sub[0-9]+$", RegexOptions.Compiled);
     private int _labelCounter;
@@ -39,12 +40,23 @@ internal class FsbCodeUnitConverter : IFsbCodeUnitConverter
 
     private Sir0Operation[] CreateOperations(MethodDeclarationSyntax method)
     {
+        if (method.Body.Statements.Count <= 0 || method.Body.Statements[^1] is not ReturnStatementSyntax)
+            method.Body.SetStatements(method.Body.Statements.Concat([CreateReturnStatement()]).ToList());
+
         var operations = new List<Sir0Operation>();
 
         AddInitOperation(operations);
         CreateOperations(operations, method.Body);
 
         return [.. operations];
+    }
+
+    private ReturnStatementSyntax CreateReturnStatement()
+    {
+        SyntaxToken returnToken = syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new ReturnStatementSyntax(returnToken, null, semicolon);
     }
 
     private void CreateOperations(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel = null)

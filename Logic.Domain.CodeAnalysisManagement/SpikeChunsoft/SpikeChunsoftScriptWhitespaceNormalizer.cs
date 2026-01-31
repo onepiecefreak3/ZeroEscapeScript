@@ -29,7 +29,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         bool shouldLineBreak = ctx.ShouldLineBreak;
 
-        ctx.ShouldLineBreak = true;
+        ctx.ShouldLineBreak = false;
         NormalizeMethodDeclarationParameters(methodDeclaration.Parameters, ctx);
 
         ctx.ShouldLineBreak = shouldLineBreak;
@@ -42,8 +42,8 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeMethodDeclarationParameters(MethodDeclarationParametersSyntax methodDeclarationParameters, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken newParenOpen = methodDeclarationParameters.ParenOpen.WithLeadingTrivia(null).WithLeadingTrivia(null);
-        SyntaxToken newParenClose = methodDeclarationParameters.ParenClose.WithLeadingTrivia(null).WithLeadingTrivia(null);
+        SyntaxToken newParenOpen = methodDeclarationParameters.ParenOpen.WithNoTrivia();
+        SyntaxToken newParenClose = methodDeclarationParameters.ParenClose.WithNoTrivia();
 
         if (ctx.ShouldLineBreak)
             newParenClose = newParenClose.WithTrailingTrivia("\r\n");
@@ -69,8 +69,13 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeMethodDeclarationBody(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken newCurlyOpen = methodDeclarationBody.CurlyOpen.WithLeadingTrivia(null).WithTrailingTrivia("\r\n");
+        SyntaxToken newCurlyOpen = methodDeclarationBody.CurlyOpen;
         SyntaxToken newCurlyClose = methodDeclarationBody.CurlyClose.WithNoTrivia();
+
+        if (methodDeclarationBody.Statements.Count <= 0)
+            newCurlyOpen = newCurlyOpen.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+        else
+            newCurlyOpen = newCurlyOpen.WithLeadingTrivia("\r\n").WithTrailingTrivia("\r\n");
 
         if (ctx.ShouldLineBreak)
             newCurlyClose = newCurlyClose.WithTrailingTrivia("\r\n\r\n");
