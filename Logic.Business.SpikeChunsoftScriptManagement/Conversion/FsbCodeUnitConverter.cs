@@ -59,15 +59,15 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return new ReturnStatementSyntax(returnToken, null, semicolon);
     }
 
-    private void CreateOperations(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel = null)
+    private void CreateOperations(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel = null, bool isNested = false)
     {
-        string? jumpLabel = CreateOperationsInternal(operations, block, leadingLabel);
+        string? jumpLabel = CreateOperationsInternal(operations, block, leadingLabel, isNested);
 
         if (jumpLabel is not null)
             BackPropagateJumpLabel(operations, jumpLabel);
     }
 
-    private string? CreateOperationsInternal(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel)
+    private string? CreateOperationsInternal(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel, bool isNested)
     {
         string? jumpLabel = leadingLabel;
         foreach (StatementSyntax statement in block.Statements)
@@ -91,27 +91,27 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                     break;
 
                 case IfStatementSyntax ifStatement:
-                    nextLabel = AddIfOperations(operations, ifStatement, jumpLabel);
+                    nextLabel = AddIfOperations(operations, ifStatement, jumpLabel, isNested);
                     break;
 
                 case IfElseStatementSyntax ifElseStatement:
-                    nextLabel = AddIfElseOperations(operations, ifElseStatement, jumpLabel);
+                    nextLabel = AddIfElseOperations(operations, ifElseStatement, jumpLabel, isNested);
                     break;
 
                 case IfNotStatementSyntax ifNotStatement:
-                    nextLabel = AddIfNotOperations(operations, ifNotStatement, jumpLabel);
+                    nextLabel = AddIfNotOperations(operations, ifNotStatement, jumpLabel, isNested);
                     break;
 
                 case IfNotElseStatementSyntax ifNotElseStatement:
-                    nextLabel = AddIfNotElseOperations(operations, ifNotElseStatement, jumpLabel);
+                    nextLabel = AddIfNotElseOperations(operations, ifNotElseStatement, jumpLabel, isNested);
                     break;
 
                 case DoWhileStatementSyntax doWhileStatement:
-                    nextLabel = AddDoWhileOperations(operations, doWhileStatement, jumpLabel);
+                    nextLabel = AddDoWhileOperations(operations, doWhileStatement, jumpLabel, isNested);
                     break;
 
                 case DoWhileNotStatementSyntax doWhileNotStatement:
-                    nextLabel = AddDoWhileNotOperations(operations, doWhileNotStatement, jumpLabel);
+                    nextLabel = AddDoWhileNotOperations(operations, doWhileNotStatement, jumpLabel, isNested);
                     break;
 
                 case BreakStatementSyntax:
@@ -170,15 +170,20 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         AddAsyncEndOperation(operations, null);
     }
 
-    private string AddIfOperations(List<Sir0Operation> operations, IfStatementSyntax ifStatement, string? jumpLabel)
+    private string AddIfOperations(List<Sir0Operation> operations, IfStatementSyntax ifStatement, string? jumpLabel, bool isNested)
     {
         string endLabel = CreateLabel();
 
         int conditionIndex = operations.Count;
         AddConditionalJumpOnFalse(operations, jumpLabel, endLabel);
 
-        string? danglingLabel = CreateOperationsInternal(operations, ifStatement.Body, null);
-        if (danglingLabel is not null)
+        string? danglingLabel = CreateOperationsInternal(operations, ifStatement.Body, null, true);
+
+        if (isNested)
+        {
+            AddGotoOperation(operations, danglingLabel, endLabel);
+        }
+        else if (danglingLabel is not null)
         {
             UpdateJumpTarget(operations, conditionIndex, danglingLabel);
             endLabel = danglingLabel;
@@ -187,18 +192,18 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfElseOperations(List<Sir0Operation> operations, IfElseStatementSyntax ifElseStatement, string? jumpLabel)
+    private string AddIfElseOperations(List<Sir0Operation> operations, IfElseStatementSyntax ifElseStatement, string? jumpLabel, bool isNested)
     {
         string elseLabel = CreateLabel();
         string endLabel = CreateLabel();
 
         AddConditionalJumpOnFalse(operations, jumpLabel, elseLabel);
 
-        string? danglingThenLabel = CreateOperationsInternal(operations, ifElseStatement.Body, null);
+        string? danglingThenLabel = CreateOperationsInternal(operations, ifElseStatement.Body, null, true);
         int gotoIndex = operations.Count;
         AddGotoOperation(operations, danglingThenLabel, endLabel);
 
-        string? danglingElseLabel = CreateOperationsInternal(operations, ifElseStatement.ElseBody, elseLabel);
+        string? danglingElseLabel = CreateOperationsInternal(operations, ifElseStatement.ElseBody, elseLabel, true);
         if (danglingElseLabel is not null)
         {
             UpdateJumpTarget(operations, gotoIndex, danglingElseLabel);
@@ -208,15 +213,20 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfNotOperations(List<Sir0Operation> operations, IfNotStatementSyntax ifNotStatement, string? jumpLabel)
+    private string AddIfNotOperations(List<Sir0Operation> operations, IfNotStatementSyntax ifNotStatement, string? jumpLabel, bool isNested)
     {
         string endLabel = CreateLabel();
 
         int conditionIndex = operations.Count;
         AddConditionalJumpOnTrue(operations, jumpLabel, endLabel);
 
-        string? danglingLabel = CreateOperationsInternal(operations, ifNotStatement.Body, null);
-        if (danglingLabel is not null)
+        string? danglingLabel = CreateOperationsInternal(operations, ifNotStatement.Body, null, true);
+
+        if (isNested)
+        {
+            AddGotoOperation(operations, danglingLabel, endLabel);
+        }
+        else if (danglingLabel is not null)
         {
             UpdateJumpTarget(operations, conditionIndex, danglingLabel);
             endLabel = danglingLabel;
@@ -225,18 +235,18 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfNotElseOperations(List<Sir0Operation> operations, IfNotElseStatementSyntax ifNotElseStatement, string? jumpLabel)
+    private string AddIfNotElseOperations(List<Sir0Operation> operations, IfNotElseStatementSyntax ifNotElseStatement, string? jumpLabel, bool isNested)
     {
         string elseLabel = CreateLabel();
         string endLabel = CreateLabel();
 
         AddConditionalJumpOnTrue(operations, jumpLabel, elseLabel);
 
-        string? danglingThenLabel = CreateOperationsInternal(operations, ifNotElseStatement.Body, null);
+        string? danglingThenLabel = CreateOperationsInternal(operations, ifNotElseStatement.Body, null, true);
         int gotoIndex = operations.Count;
         AddGotoOperation(operations, danglingThenLabel, endLabel);
 
-        string? danglingElseLabel = CreateOperationsInternal(operations, ifNotElseStatement.ElseBody, elseLabel);
+        string? danglingElseLabel = CreateOperationsInternal(operations, ifNotElseStatement.ElseBody, elseLabel, true);
         if (danglingElseLabel is not null)
         {
             UpdateJumpTarget(operations, gotoIndex, danglingElseLabel);
@@ -246,7 +256,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string? AddDoWhileOperations(List<Sir0Operation> operations, DoWhileStatementSyntax doWhileStatement, string? jumpLabel)
+    private string? AddDoWhileOperations(List<Sir0Operation> operations, DoWhileStatementSyntax doWhileStatement, string? jumpLabel, bool isNested)
     {
         string startLabel = jumpLabel ?? CreateLabel();
         string breakLabel = CreateLabel();
@@ -254,7 +264,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         var loopContext = new LoopEmissionContext(startLabel, breakLabel);
         _loopContextStack.Push(loopContext);
 
-        string? danglingLabel = CreateOperationsInternal(operations, doWhileStatement.Body, startLabel);
+        string? danglingLabel = CreateOperationsInternal(operations, doWhileStatement.Body, startLabel, true);
 
         // HINT: "while (false)" is emitted as no additional operations
         if (doWhileStatement.Condition.Literal.RawKind == (int)SyntaxTokenKind.TrueKeyword)
@@ -267,14 +277,14 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return loopContext.BreakUsed ? breakLabel : null;
     }
 
-    private string? AddDoWhileNotOperations(List<Sir0Operation> operations, DoWhileNotStatementSyntax doWhileNotStatement, string? jumpLabel)
+    private string? AddDoWhileNotOperations(List<Sir0Operation> operations, DoWhileNotStatementSyntax doWhileNotStatement, string? jumpLabel, bool isNested)
     {
         string startLabel = jumpLabel ?? CreateLabel();
         string breakLabel = CreateLabel();
         var loopContext = new LoopEmissionContext(startLabel, breakLabel);
         _loopContextStack.Push(loopContext);
 
-        string? danglingLabel = CreateOperationsInternal(operations, doWhileNotStatement.Body, startLabel);
+        string? danglingLabel = CreateOperationsInternal(operations, doWhileNotStatement.Body, startLabel, true);
 
         // HINT: "while not (true)" is emitted as no additional operations
         if (doWhileNotStatement.Condition.Literal.RawKind == (int)SyntaxTokenKind.FalseKeyword)

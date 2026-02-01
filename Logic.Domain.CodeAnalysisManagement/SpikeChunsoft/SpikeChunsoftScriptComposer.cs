@@ -64,6 +64,14 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         switch (statement)
         {
+            case GotoLabelStatementSyntax gotoLabel:
+                ComposeGotoLabelStatement(gotoLabel, sb);
+                break;
+
+            case GotoStatementSyntax gotoStatement:
+                ComposeGotoStatement(gotoStatement, sb);
+                break;
+
             case AsyncBlockStatement asyncStatement:
                 ComposeAsyncBlockStatement(asyncStatement, sb);
                 break;
@@ -108,6 +116,19 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
                 ComposeMethodInvocationStatement(methodInvocationStatement, sb);
                 break;
         }
+    }
+
+    private void ComposeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, StringBuilder sb)
+    {
+        ComposeLiteralExpression(gotoLabelStatement.Label, sb);
+        ComposeSyntaxToken(gotoLabelStatement.Colon, sb);
+    }
+
+    private void ComposeGotoStatement(GotoStatementSyntax gotoStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(gotoStatement.Goto, sb);
+        ComposeLiteralExpression(gotoStatement.Label, sb);
+        ComposeSyntaxToken(gotoStatement.Semicolon, sb);
     }
 
     private void ComposeAsyncBlockStatement(AsyncBlockStatement asyncStatement, StringBuilder sb)

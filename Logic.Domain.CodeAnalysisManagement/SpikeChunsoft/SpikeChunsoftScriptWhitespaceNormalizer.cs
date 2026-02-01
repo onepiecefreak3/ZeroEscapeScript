@@ -98,6 +98,14 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         switch (statement)
         {
+            case GotoLabelStatementSyntax gotoLabel:
+                NormalizeGotoLabelStatement(gotoLabel, ctx);
+                break;
+
+            case GotoStatementSyntax gotoStatement:
+                NormalizeGotoStatement(gotoStatement, ctx);
+                break;
+
             case AsyncBlockStatement asyncStatement:
                 NormalizeAsyncBlockStatement(asyncStatement, ctx);
                 break;
@@ -142,6 +150,36 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeMethodInvocationStatement(methodInvocationStatement, ctx);
                 break;
         }
+    }
+
+    private void NormalizeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newColon = gotoLabelStatement.Colon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            newColon = newColon.WithTrailingTrivia("\r\n");
+
+        gotoLabelStatement.SetColon(newColon, false);
+
+        ctx.Indent--;
+        ctx.ShouldIndent = true;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(gotoLabelStatement.Label, ctx);
+    }
+
+    private void NormalizeGotoStatement(GotoStatementSyntax gotoStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newGotoKeyword = gotoStatement.Goto.WithTrailingTrivia(" ");
+        SyntaxToken newSemicolon = gotoStatement.Semicolon.WithNoTrivia();
+
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            newGotoKeyword = newGotoKeyword.WithLeadingTrivia(new string('\t', ctx.Indent));
+
+        if (ctx.ShouldLineBreak)
+            newSemicolon = newSemicolon.WithTrailingTrivia("\r\n");
+
+        gotoStatement.SetGoto(newGotoKeyword, false);
+        gotoStatement.SetSemicolon(newSemicolon, false);
     }
 
     private void NormalizeReturnStatement(ReturnStatementSyntax returnStatement, WhitespaceNormalizeContext ctx)

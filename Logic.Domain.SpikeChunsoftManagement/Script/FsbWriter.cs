@@ -126,23 +126,45 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
         writer.Write((byte)4);
         writer.Write((byte)4);
 
-        WriteVariableInt(writer, text1Offset - 8);
-        for (var i = 0; i < data.Texts1.Length - 1; i++)
-            writer.Write((byte)4);
+        var lastOffset = 8;
 
-        WriteVariableInt(writer, text2Offset - (text1Offset + data.Texts1.Length * 4) + 4);
-        for (var i = 0; i < data.Texts2.Length - 1; i++)
-            writer.Write((byte)4);
+        if (data.Texts1.Length > 0)
+        {
+            WriteVariableInt(writer, text1Offset - lastOffset);
+            for (var i = 0; i < data.Texts1.Length - 1; i++)
+                writer.Write((byte)4);
 
-        WriteVariableInt(writer, text3Offset - (text2Offset + data.Texts2.Length * 4) + 4);
-        for (var i = 0; i < data.Texts3.Length - 1; i++)
-            writer.Write((byte)4);
+            lastOffset = text1Offset + data.Texts1.Length * 4 - 4;
+        }
 
-        WriteVariableInt(writer, functionOffset - (text3Offset + data.Texts3.Length * 4) + 4);
-        for (var i = 0; i < data.Functions.Length * 2 - 1; i++)
-            writer.Write((byte)4);
+        if (data.Texts2.Length > 0)
+        {
+            WriteVariableInt(writer, text2Offset - lastOffset);
+            for (var i = 0; i < data.Texts2.Length - 1; i++)
+                writer.Write((byte)4);
 
-        WriteVariableInt(writer, indexOffset - (functionOffset + data.Functions.Length * 8) + 4);
+            lastOffset = text2Offset + data.Texts2.Length * 4 - 4;
+        }
+
+        if (data.Texts3.Length > 0)
+        {
+            WriteVariableInt(writer, text3Offset - lastOffset);
+            for (var i = 0; i < data.Texts3.Length - 1; i++)
+                writer.Write((byte)4);
+
+            lastOffset = text3Offset + data.Texts3.Length * 4 - 4;
+        }
+
+        if (data.Functions.Length > 0)
+        {
+            WriteVariableInt(writer, functionOffset - lastOffset);
+            for (var i = 0; i < data.Functions.Length * 2 - 1; i++)
+                writer.Write((byte)4);
+
+            lastOffset = functionOffset + data.Functions.Length * 8 - 4;
+        }
+
+        WriteVariableInt(writer, indexOffset - lastOffset);
 
         writer.Write((byte)4);
         writer.Write((byte)8);

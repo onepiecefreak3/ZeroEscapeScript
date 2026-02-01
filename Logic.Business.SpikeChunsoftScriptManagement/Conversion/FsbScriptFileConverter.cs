@@ -81,6 +81,16 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         }
     }
 
+    private GotoStatementSyntax CreateGotoStatement(string jumpLabel)
+    {
+        SyntaxToken gotoToken = syntaxFactory.Token(SyntaxTokenKind.GotoKeyword);
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        var label = CreateStringLiteralExpression(jumpLabel);
+
+        return new GotoStatementSyntax(gotoToken, label, semicolon);
+    }
+
     private ReturnStatementSyntax CreateReturnStatement()
     {
         SyntaxToken returnToken = syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
@@ -182,6 +192,13 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private LiteralExpressionSyntax CreateTrueLiteralExpression()
     {
         return new LiteralExpressionSyntax(syntaxFactory.Token(SyntaxTokenKind.TrueKeyword));
+    }
+
+    private GotoLabelStatementSyntax CreateGotoLabelStatement(string jumpLabel)
+    {
+        var colon = syntaxFactory.Token(SyntaxTokenKind.Colon);
+
+        return new GotoLabelStatementSyntax(CreateStringLiteralExpression(jumpLabel), colon);
     }
 
     private NameSyntax CreateName(string name)
@@ -429,7 +446,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
         for (var index = 0; index < endIndex;)
         {
-            if (blockOperations[index].Command is 0x25 or 0x26 or 0x35 or 0x36 or 0x37)
+            if (blockOperations[index].Command is 0x25 or 0x26)
             {
                 index++;
                 continue;
