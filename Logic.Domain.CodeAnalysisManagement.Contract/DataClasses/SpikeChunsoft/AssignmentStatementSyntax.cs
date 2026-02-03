@@ -1,30 +1,31 @@
 ﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
-public class MethodInvocationStatementSyntax : StatementSyntax
+public class AssignmentStatementSyntax : StatementSyntax
 {
-    public MethodInvocationExpressionSyntax Method { get; private set; }
+    public AssignmentExpressionSyntax Assignment { get; private set; }
     public SyntaxToken Semicolon { get; private set; }
 
-    public override SyntaxLocation Location => Method.Location;
-    public override SyntaxSpan Span => new(Method.Span.Position, Semicolon.FullSpan.EndPosition);
+    public override SyntaxLocation Location => Assignment.Location;
+    public override SyntaxSpan Span => new(Assignment.Span.Position, Semicolon.FullSpan.EndPosition);
 
-    public MethodInvocationStatementSyntax(MethodInvocationExpressionSyntax method, SyntaxToken semicolon)
+    public AssignmentStatementSyntax(AssignmentExpressionSyntax assignment, SyntaxToken semicolon)
     {
-        method.Parent = this;
+        assignment.Parent = this;
         semicolon.Parent = this;
 
-        Method = method;
+        Assignment = assignment;
         Semicolon = semicolon;
 
         Root.Update();
     }
 
-    public void SetMethod(MethodInvocationExpressionSyntax method, bool updatePosition = true)
+    public void SetAssignment(AssignmentExpressionSyntax assignment, bool updatePositions = true)
     {
-        method.Parent = this;
-        Method = method;
+        assignment.Parent = this;
 
-        if (updatePosition)
+        Assignment = assignment;
+
+        if (updatePositions)
             Root.Update();
     }
 
@@ -42,7 +43,7 @@ public class MethodInvocationStatementSyntax : StatementSyntax
     {
         SyntaxToken semicolon = Semicolon;
 
-        position = Method.UpdatePosition(position, ref line, ref column);
+        position = Assignment.UpdatePosition(position, ref line, ref column);
         position = semicolon.UpdatePosition(position, ref line, ref column);
 
         Semicolon = semicolon;

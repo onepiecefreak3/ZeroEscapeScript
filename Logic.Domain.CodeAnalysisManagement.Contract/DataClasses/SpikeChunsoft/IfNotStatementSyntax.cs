@@ -5,14 +5,14 @@ public class IfNotStatementSyntax : StatementSyntax
     public SyntaxToken If { get; private set; }
     public SyntaxToken Not { get; private set; }
     public SyntaxToken ParenOpen { get; private set; }
-    public LiteralExpressionSyntax Condition { get; private set; }
+    public ExpressionSyntax Condition { get; private set; }
     public SyntaxToken ParenClose { get; private set; }
     public BlockExpression Body { get; private set; }
 
     public override SyntaxLocation Location => If.FullLocation;
     public override SyntaxSpan Span => new(If.FullSpan.Position, Body.Span.EndPosition);
 
-    public IfNotStatementSyntax(SyntaxToken ifToken, SyntaxToken notToken, SyntaxToken parenOpen, LiteralExpressionSyntax condition,
+    public IfNotStatementSyntax(SyntaxToken ifToken, SyntaxToken notToken, SyntaxToken parenOpen, ExpressionSyntax condition,
         SyntaxToken parenClose, BlockExpression body)
     {
         ifToken.Parent = this;

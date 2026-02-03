@@ -38,20 +38,15 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Semicolon, Position, Line, Column, $"{ReadChar()}");
             case '=':
                 if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Equals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.EqualsEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
-                if (IsPeekedChar(1, '>'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ArrowRight, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+                break;
 
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.EqualsSign, Position, Line, Column, $"{ReadChar()}");
-
-            case '~':
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Complement, Position, Line, Column, $"{ReadChar()}");
             case '!':
                 if (IsPeekedChar(1, '='))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NotEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Not, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ExclamationPoint, Position, Line, Column, $"{ReadChar()}");
 
             case '(':
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ParenOpen, Position, Line, Column, $"{ReadChar()}");
@@ -70,92 +65,52 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.SmallerEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
                 if (IsPeekedChar(1, '<'))
-                {
-                    if (IsPeekedChar(2, '='))
-                        return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.LeftShiftEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ShiftLeft, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.LeftShift, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-                }
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Smaller, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.SmallerThan, Position, Line, Column, $"{ReadChar()}");
 
             case '>':
                 if (IsPeekedChar(1, '='))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.GreaterEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
                 if (IsPeekedChar(1, '>'))
-                {
-                    if (IsPeekedChar(2, '='))
-                        return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.RightShiftEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ShiftRight, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.RightShift, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-                }
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Greater, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.GreaterThan, Position, Line, Column, $"{ReadChar()}");
 
             case '*':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MulEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Mul, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Asterisk, Position, Line, Column, $"{ReadChar()}");
 
             case '/':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.DivEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
                 if (!IsPeekedChar(1, '/'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Div, Position, Line, Column, $"{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Slash, Position, Line, Column, $"{ReadChar()}");
 
                 goto case ' ';
 
             case '%':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ModEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Mod, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Percent, Position, Line, Column, $"{ReadChar()}");
 
             case '&':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AndEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                if (IsPeekedChar(1, '&'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AndAnd, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.And, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Ampersand, Position, Line, Column, $"{ReadChar()}");
 
             case '|':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.OrEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                if (IsPeekedChar(1, '|'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.OrOr, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Or, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Pipe, Position, Line, Column, $"{ReadChar()}");
 
             case '^':
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.XorEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Xor, Position, Line, Column, $"{ReadChar()}");
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Caret, Position, Line, Column, $"{ReadChar()}");
 
             case '-':
                 if (IsPeekedChar(1, '.') || (TryPeekChar(1, out character) && character is >= '0' and <= '9'))
                     goto case '.';
 
                 if (IsPeekedChar(1, '-'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Decrement, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MinusEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MinusMinus, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Minus, Position, Line, Column, $"{ReadChar()}");
 
             case '+':
                 if (IsPeekedChar(1, '+'))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Increment, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
-
-                if (IsPeekedChar(1, '='))
-                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.PlusEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.PlusPlus, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Plus, Position, Line, Column, $"{ReadChar()}");
 
@@ -171,7 +126,7 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case '.':
                 if (TryPeekChar(1, out character) && character is >= '0' and <= '9')
                     goto case '0';
-                
+
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Dot, Position, Line, Column, $"{ReadChar()}");
 
             case '0':
@@ -241,9 +196,6 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case '_':
             case '@':
                 return ReadIdentifierOrKeyword();
-
-            case '$':
-                return ReadVariable();
         }
 
         throw CreateException("Invalid character.");
@@ -329,11 +281,7 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
 
         _sb.Append(ReadChar());
 
-        if (!IsPeekedChar('h'))
-            return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.StringLiteral, position, line, column, _sb.ToString());
-
-        _sb.Append(ReadChar());
-        return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.HashStringLiteral, position, line, column, _sb.ToString());
+        return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.StringLiteral, position, line, column, _sb.ToString());
 
     }
 
@@ -418,24 +366,6 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                         throw CreateException("Floating numeric value misses fractional part.");
 
                     kind = SyntaxTokenKind.FloatingNumericLiteral;
-
-                    _sb.Append(ReadChar());
-                    break;
-
-                case 'h':
-                    if (hasDot)
-                        throw CreateException("Floating numeric literal marked as hash numeric literal ('h').");
-
-                    kind = SyntaxTokenKind.HashNumericLiteral;
-
-                    _sb.Append(ReadChar());
-                    break;
-
-                case 'u':
-                    if (hasDot)
-                        throw CreateException("Floating numeric literal marked as unsigned numeric literal ('u').");
-
-                    kind = SyntaxTokenKind.UnsignedNumericLiteral;
 
                     _sb.Append(ReadChar());
                     break;
@@ -552,32 +482,11 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
         var finalValue = _sb.ToString();
         switch (finalValue)
         {
-            case "_":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Underscore, position, line, column, finalValue);
-
-            case "true":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.TrueKeyword, position, line, column, finalValue);
-
-            case "false":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.FalseKeyword, position, line, column, finalValue);
-
-            case "yield":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.YieldKeyword, position, line, column, finalValue);
-
-            case "async":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AsyncKeyword, position, line, column, finalValue);
-
             case "return":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ReturnKeyword, position, line, column, finalValue);
 
-            case "exit":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ExitKeyword, position, line, column, finalValue);
-
-            case "new":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NewKeyword, position, line, column, finalValue);
-
-            case "not":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NotKeyword, position, line, column, finalValue);
+            case "goto":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.GotoKeyword, position, line, column, finalValue);
 
             case "and":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AndKeyword, position, line, column, finalValue);
@@ -585,11 +494,8 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case "or":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.OrKeyword, position, line, column, finalValue);
 
-            case "switch":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.SwitchKeyword, position, line, column, finalValue);
-
-            case "goto":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.GotoKeyword, position, line, column, finalValue);
+            case "not":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NotKeyword, position, line, column, finalValue);
 
             case "if":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.IfKeyword, position, line, column, finalValue);
@@ -603,40 +509,24 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case "while":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.WhileKeyword, position, line, column, finalValue);
 
+            case "async":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.AsyncKeyword, position, line, column, finalValue);
+
+            case "true":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.TrueKeyword, position, line, column, finalValue);
+
+            case "false":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.FalseKeyword, position, line, column, finalValue);
+
             case "break":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.BreakKeyword, position, line, column, finalValue);
 
             case "continue":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ContinueKeyword, position, line, column, finalValue);
 
-            case "int":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.IntKeyword, position, line, column, finalValue);
-
-            case "bool":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.BoolKeyword, position, line, column, finalValue);
-
-            case "float":
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.FloatKeyword, position, line, column, finalValue);
-
             default:
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Identifier, position, line, column, finalValue);
         }
-    }
-
-    private SpikeChunsoftSyntaxToken ReadVariable()
-    {
-        int position = Position;
-        int line = Line;
-        int column = Column;
-
-        if (!IsPeekedChar('$'))
-            throw CreateException("Invalid variable.", "$");
-
-        ReadChar();
-
-        SpikeChunsoftSyntaxToken identifier = ReadIdentifierOrKeyword();
-
-        return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Variable, position, line, column, $"${identifier.Text}");
     }
 
     private bool IsPeekedChar(char expected)

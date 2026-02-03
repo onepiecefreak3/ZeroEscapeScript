@@ -53,8 +53,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         methodDeclarationParameters.SetParenClose(newParenClose, false);
     }
 
-    private void NormalizeMethodDeclarationParameterList(CommaSeparatedSyntaxList<LiteralExpressionSyntax>? list,
-        WhitespaceNormalizeContext ctx)
+    private void NormalizeMethodDeclarationParameterList(CommaSeparatedSyntaxList<LiteralExpressionSyntax>? list, WhitespaceNormalizeContext ctx)
     {
         if (list == null)
             return;
@@ -98,6 +97,14 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         switch (statement)
         {
+            case AssignmentStatementSyntax assignment:
+                NormalizeAssignmentStatement(assignment, ctx);
+                break;
+
+            case NativeMethodInvocationStatementSyntax invocation:
+                NormalizeNativeMethodInvocationStatement(invocation, ctx);
+                break;
+
             case GotoLabelStatementSyntax gotoLabel:
                 NormalizeGotoLabelStatement(gotoLabel, ctx);
                 break;
@@ -150,6 +157,30 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeMethodInvocationStatement(methodInvocationStatement, ctx);
                 break;
         }
+    }
+
+    private void NormalizeAssignmentStatement(AssignmentStatementSyntax assignmentStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newSemicolon = assignmentStatement.Semicolon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            newSemicolon = newSemicolon.WithTrailingTrivia("\r\n");
+
+        NormalizeAssignmentExpression(assignmentStatement.Assignment, ctx);
+
+        assignmentStatement.SetSemicolon(newSemicolon, false);
+    }
+
+    private void NormalizeNativeMethodInvocationStatement(NativeMethodInvocationStatementSyntax invocationStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newSemicolon = invocationStatement.Semicolon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            newSemicolon = newSemicolon.WithTrailingTrivia("\r\n");
+
+        NormalizeNativeMethodInvocationExpression(invocationStatement.Method, ctx);
+
+        invocationStatement.SetSemicolon(newSemicolon, false);
     }
 
     private void NormalizeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, WhitespaceNormalizeContext ctx)
@@ -239,7 +270,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(ifStatement.Condition, ctx);
+        NormalizeExpression(ifStatement.Condition, ctx);
     }
 
     private void NormalizeIfElseStatement(IfElseStatementSyntax ifElseStatement, WhitespaceNormalizeContext ctx)
@@ -264,7 +295,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(ifElseStatement.Condition, ctx);
+        NormalizeExpression(ifElseStatement.Condition, ctx);
     }
 
     private void NormalizeIfNotStatement(IfNotStatementSyntax ifNotStatement, WhitespaceNormalizeContext ctx)
@@ -288,7 +319,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(ifNotStatement.Condition, ctx);
+        NormalizeExpression(ifNotStatement.Condition, ctx);
     }
 
     private void NormalizeIfNotElseStatement(IfNotElseStatementSyntax ifNotElseStatement, WhitespaceNormalizeContext ctx)
@@ -315,7 +346,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(ifNotElseStatement.Condition, ctx);
+        NormalizeExpression(ifNotElseStatement.Condition, ctx);
     }
 
     private void NormalizeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, WhitespaceNormalizeContext ctx)
@@ -438,12 +469,16 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         if (ctx.ShouldLineBreak)
             newSemicolon = newSemicolon.WithTrailingTrivia("\r\n");
 
-        NormalizeName(invocation.Name, ctx);
-
         invocation.SetSemicolon(newSemicolon, false);
 
-        ctx.ShouldIndent = false;
+        ctx.ShouldIndent = true;
         ctx.ShouldLineBreak = false;
+        NormalizeMethodInvocationExpression(invocation.Method, ctx);
+    }
+
+    private void NormalizeMethodInvocationExpression(MethodInvocationExpressionSyntax invocation, WhitespaceNormalizeContext ctx)
+    {
+        NormalizeName(invocation.Name, ctx);
         NormalizeMethodInvocationParameters(invocation.Parameters, ctx);
     }
 
@@ -455,7 +490,167 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         invocationParameters.SetParenOpen(parenOpen, false);
         invocationParameters.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = false;
         NormalizeLiteralExpressions(invocationParameters.ParameterList, ctx);
+    }
+
+    private void NormalizeExpression(ExpressionSyntax expression, WhitespaceNormalizeContext ctx)
+    {
+        switch (expression)
+        {
+            case ParenthesizedExpressionSyntax parens:
+                NormalizeParenthesizedExpression(parens, ctx);
+                break;
+
+            case BinaryExpressionSyntax binary:
+                NormalizeBinaryExpression(binary, ctx);
+                break;
+
+            case LogicalExpressionSyntax logical:
+                NormalizeLogicalExpression(logical, ctx);
+                break;
+
+            case UnaryExpressionSyntax unary:
+                NormalizeUnaryExpression(unary, ctx);
+                break;
+
+            case LiteralExpressionSyntax literalExpression:
+                NormalizeLiteralExpression(literalExpression, ctx);
+                break;
+
+            case ArrayIndexExpressionSyntax arrayIndex:
+                NormalizeArrayIndexExpression(arrayIndex, ctx);
+                break;
+
+            case PostfixExpressionSyntax postfix:
+                NormalizePostfixExpression(postfix, ctx);
+                break;
+
+            case AssignmentExpressionSyntax assignment:
+                NormalizeAssignmentExpression(assignment, ctx);
+                break;
+
+            case NativeMethodInvocationExpressionSyntax invocation:
+                NormalizeNativeMethodInvocationExpression(invocation, ctx);
+                break;
+        }
+    }
+
+    private void NormalizeParenthesizedExpression(ParenthesizedExpressionSyntax parens, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken parenOpen = parens.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = parens.ParenClose.WithNoTrivia();
+
+        parens.SetParenOpen(parenOpen, false);
+        parens.SetParenClose(parenClose, false);
+
+        NormalizeExpression(parens.Expression, ctx);
+    }
+
+    private void NormalizeBinaryExpression(BinaryExpressionSyntax binary, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken operation = binary.Operation.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+
+        binary.SetOperation(operation, false);
+
+        NormalizeExpression(binary.Left, ctx);
+        NormalizeExpression(binary.Right, ctx);
+    }
+
+    private void NormalizeLogicalExpression(LogicalExpressionSyntax logical, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken operation = logical.Operation.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+
+        logical.SetOperation(operation, false);
+
+        NormalizeExpression(logical.Left, ctx);
+        NormalizeExpression(logical.Right, ctx);
+    }
+
+    private void NormalizeUnaryExpression(UnaryExpressionSyntax unaryExpression, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken operation = unaryExpression.Operation.WithNoTrivia();
+
+        ctx.IsFirstElement = true;
+        NormalizeExpression(unaryExpression.Expression, ctx);
+
+        unaryExpression.SetOperation(operation, false);
+    }
+
+    private void NormalizeArrayIndexExpression(ArrayIndexExpressionSyntax arrayIndex, WhitespaceNormalizeContext ctx)
+    {
+        NormalizeExpression(arrayIndex.Value, ctx);
+        foreach (var index in arrayIndex.Indexer)
+            NormalizeArrayIndexExpression(index, ctx);
+    }
+
+    private void NormalizeArrayIndexExpression(ArrayIndexerExpressionSyntax index, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken bracketOpen = index.BracketOpen.WithNoTrivia();
+        SyntaxToken bracketClose = index.BracketClose.WithNoTrivia();
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        NormalizeExpression(index.Index, ctx);
+
+        index.SetBracketOpen(bracketOpen, false);
+        index.SetBracketClose(bracketClose, false);
+    }
+
+    private void NormalizePostfixExpression(PostfixExpressionSyntax postfixExpression, WhitespaceNormalizeContext ctx)
+    {
+        ctx.IsFirstElement = true;
+        ctx.ShouldLineBreak = false;
+        NormalizeExpression(postfixExpression.Expression, ctx);
+    }
+
+    private void NormalizeAssignmentExpression(AssignmentExpressionSyntax assignmentExpression, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newOperator = assignmentExpression.Operator.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+
+        ctx.ShouldIndent = true;
+        ctx.ShouldLineBreak = false;
+        ctx.IsFirstElement = true;
+        NormalizeExpression(assignmentExpression.Left, ctx);
+
+        ctx.ShouldIndent = false;
+        NormalizeExpression(assignmentExpression.Right, ctx);
+
+        assignmentExpression.SetOperator(newOperator, false);
+    }
+
+    private void NormalizeNativeMethodInvocationExpression(NativeMethodInvocationExpressionSyntax invocation, WhitespaceNormalizeContext ctx)
+    {
+        NormalizeNativeMethodInvocationParameters(invocation.Parameters, ctx);
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(invocation.Name, ctx);
+    }
+
+    private void NormalizeNativeMethodInvocationParameters(NativeMethodInvocationParametersSyntax invocationParameters, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken parenOpen = invocationParameters.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = invocationParameters.ParenClose.WithNoTrivia();
+
+        invocationParameters.SetParenOpen(parenOpen, false);
+        invocationParameters.SetParenClose(parenClose, false);
+
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeExpressions(invocationParameters.ParameterList, ctx);
+    }
+
+    private void NormalizeExpressions(CommaSeparatedSyntaxList<ExpressionSyntax>? valueList, WhitespaceNormalizeContext ctx)
+    {
+        if (valueList == null)
+            return;
+
+        foreach (ExpressionSyntax value in valueList.Elements)
+        {
+            ctx.IsFirstElement = valueList.Elements[0] == value;
+            NormalizeExpression(value, ctx);
+        }
     }
 
     private void NormalizeLiteralExpressions(CommaSeparatedSyntaxList<LiteralExpressionSyntax>? valueList, WhitespaceNormalizeContext ctx)

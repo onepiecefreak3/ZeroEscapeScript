@@ -148,16 +148,16 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
     private void AddOperations(List<Sir0Operation> operations, MethodInvocationStatementSyntax methodInvocation, string? jumpLabel)
     {
-        byte operation = GetOperation(methodInvocation.Name);
+        byte operation = GetOperation(methodInvocation.Method.Name);
 
         object[] arguments = [];
-        if (methodInvocation.Parameters.ParameterList != null)
+        if (methodInvocation.Method.Parameters.ParameterList != null)
         {
-            var literals = methodInvocation.Parameters.ParameterList.Elements;
+            var literals = methodInvocation.Method.Parameters.ParameterList.Elements;
             arguments = new object[literals.Count];
 
             for (var i = 0; i < literals.Count; i++)
-                arguments[i] = GetArgument(literals[i]);
+                arguments[i] = GetArgument((LiteralExpressionSyntax)literals[i]);
         }
 
         operations.Add(new Sir0Operation(jumpLabel, operation, arguments));

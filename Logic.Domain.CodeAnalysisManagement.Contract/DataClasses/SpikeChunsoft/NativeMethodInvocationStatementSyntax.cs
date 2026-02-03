@@ -1,14 +1,14 @@
 ﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
-public class MethodInvocationStatementSyntax : StatementSyntax
+public class NativeMethodInvocationStatementSyntax : StatementSyntax
 {
-    public MethodInvocationExpressionSyntax Method { get; private set; }
+    public NativeMethodInvocationExpressionSyntax Method { get; private set; }
     public SyntaxToken Semicolon { get; private set; }
 
     public override SyntaxLocation Location => Method.Location;
     public override SyntaxSpan Span => new(Method.Span.Position, Semicolon.FullSpan.EndPosition);
 
-    public MethodInvocationStatementSyntax(MethodInvocationExpressionSyntax method, SyntaxToken semicolon)
+    public NativeMethodInvocationStatementSyntax(NativeMethodInvocationExpressionSyntax method, SyntaxToken semicolon)
     {
         method.Parent = this;
         semicolon.Parent = this;
@@ -19,7 +19,7 @@ public class MethodInvocationStatementSyntax : StatementSyntax
         Root.Update();
     }
 
-    public void SetMethod(MethodInvocationExpressionSyntax method, bool updatePosition = true)
+    public void SetMethod(NativeMethodInvocationExpressionSyntax method, bool updatePosition = true)
     {
         method.Parent = this;
         Method = method;

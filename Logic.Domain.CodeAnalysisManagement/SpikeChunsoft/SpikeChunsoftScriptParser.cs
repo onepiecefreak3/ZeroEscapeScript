@@ -9,6 +9,28 @@ namespace Logic.Domain.CodeAnalysisManagement.SpikeChunsoft;
 
 internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 {
+    private readonly Dictionary<SyntaxTokenKind, int> _tokenPrecedence = new()
+    {
+        [SyntaxTokenKind.Asterisk] = 9,
+        [SyntaxTokenKind.Slash] = 9,
+        [SyntaxTokenKind.Percent] = 9,
+        [SyntaxTokenKind.Plus] = 8,
+        [SyntaxTokenKind.Minus] = 8,
+        [SyntaxTokenKind.ShiftLeft] = 7,
+        [SyntaxTokenKind.ShiftRight] = 7,
+        [SyntaxTokenKind.GreaterThan] = 6,
+        [SyntaxTokenKind.GreaterEquals] = 6,
+        [SyntaxTokenKind.SmallerThan] = 6,
+        [SyntaxTokenKind.SmallerEquals] = 6,
+        [SyntaxTokenKind.EqualsEquals] = 5,
+        [SyntaxTokenKind.NotEquals] = 5,
+        [SyntaxTokenKind.Ampersand] = 4,
+        [SyntaxTokenKind.Caret] = 3,
+        [SyntaxTokenKind.Pipe] = 2,
+        [SyntaxTokenKind.AndKeyword] = 1,
+        [SyntaxTokenKind.OrKeyword] = 0
+    };
+
     private readonly ITokenFactory<SpikeChunsoftSyntaxToken> _scriptFactory;
     private readonly ISpikeChunsoftSyntaxFactory _syntaxFactory;
 
@@ -64,7 +86,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     {
         var result = new List<LiteralExpressionSyntax>();
 
-        if (!HasTokenKind(buffer, SyntaxTokenKind.Variable))
+        if (!IsLiteralExpression(buffer))
             return null;
 
         LiteralExpressionSyntax variable = ParseLiteralExpression(buffer);
@@ -74,8 +96,8 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         {
             SkipTokenKind(buffer, SyntaxTokenKind.Comma);
 
-            if (!HasTokenKind(buffer, SyntaxTokenKind.Variable))
-                throw CreateException(buffer, "Invalid end of parameter list.", SyntaxTokenKind.Variable);
+            if (!IsLiteralExpression(buffer))
+                throw CreateException(buffer, "Invalid end of parameter list.");
 
             variable = ParseLiteralExpression(buffer);
             result.Add(variable);
@@ -257,11 +279,18 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private MethodInvocationStatementSyntax ParseMethodInvocationStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        NameSyntax name = ParseName(buffer);
-        var methodInvocationParameters = ParseMethodInvocationParameters(buffer);
+        var invocation = ParseMethodInvocationExpression(buffer);
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
-        return new MethodInvocationStatementSyntax(name, methodInvocationParameters, semicolon);
+        return new MethodInvocationStatementSyntax(invocation, semicolon);
+    }
+
+    private MethodInvocationExpressionSyntax ParseMethodInvocationExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        NameSyntax name = ParseName(buffer);
+        var methodInvocationParameters = ParseMethodInvocationParameters(buffer);
+
+        return new MethodInvocationExpressionSyntax(name, methodInvocationParameters);
     }
 
     private MethodInvocationParametersSyntax ParseMethodInvocationParameters(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -275,7 +304,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private CommaSeparatedSyntaxList<LiteralExpressionSyntax>? ParseValueList(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        if (!IsValueExpression(buffer))
+        if (!IsLiteralExpression(buffer))
             return null;
 
         var result = new List<LiteralExpressionSyntax>();
@@ -287,9 +316,8 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         {
             SkipTokenKind(buffer, SyntaxTokenKind.Comma);
 
-            if (!IsValueExpression(buffer))
-                throw CreateException(buffer, "Invalid end of parameter list.", SyntaxTokenKind.StringLiteral, SyntaxTokenKind.NumericLiteral,
-                    SyntaxTokenKind.FloatingNumericLiteral);
+            if (!IsLiteralExpression(buffer))
+                throw CreateException(buffer, "Invalid end of parameter list.");
 
             parameter = ParseLiteralExpression(buffer);
             result.Add(parameter);
@@ -298,21 +326,241 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return new CommaSeparatedSyntaxList<LiteralExpressionSyntax>(result);
     }
 
-    private bool IsValueExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    private ExpressionSyntax ParseExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer, int minPrecedence = 0)
     {
-        return HasTokenKind(buffer, SyntaxTokenKind.Variable) ||
-               IsLiteralExpression(buffer);
+        ExpressionSyntax left = ParseAtomicExpression(buffer);
+
+        while (IsCompoundExpression(buffer))
+        {
+            int currentPrecedence = _tokenPrecedence[buffer.Peek().Kind];
+
+            if (currentPrecedence < minPrecedence)
+                break;
+
+            bool isBinary = IsBinaryExpression(buffer);
+            bool isLogical = IsLogicalExpression(buffer);
+
+            SyntaxToken operatorToken = ParseOperatorToken(buffer);
+            int newMinPrecedence = currentPrecedence + 1;
+
+            ExpressionSyntax right = ParseExpression(buffer, newMinPrecedence);
+
+            if (isBinary)
+                left = new BinaryExpressionSyntax(left, operatorToken, right);
+            else if (isLogical)
+                left = new LogicalExpressionSyntax(left, operatorToken, right);
+        }
+
+        return left;
+    }
+
+    private SyntaxToken ParseOperatorToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (HasTokenKind(buffer, SyntaxTokenKind.Asterisk))
+            return ParseAsteriskToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Slash))
+            return ParseSlashToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Percent))
+            return ParsePercentToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Plus))
+            return ParsePlusToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Minus))
+            return ParseMinusToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.ShiftLeft))
+            return ParseShiftLeftToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.ShiftRight))
+            return ParseShiftRightToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.GreaterThan))
+            return ParseGreaterThanToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.GreaterEquals))
+            return ParseGreaterEqualsToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.SmallerThan))
+            return ParseSmallerThanToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.SmallerEquals))
+            return ParseSmallerEqualsToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.EqualsEquals))
+            return ParseEqualsEqualsToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.NotEquals))
+            return ParseNotEqualsToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Ampersand))
+            return ParseAmpersandToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Caret))
+            return ParseCaretToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Pipe))
+            return ParsePipeToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.AndKeyword))
+            return ParseAndKeywordToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.OrKeyword))
+            return ParseOrKeywordToken(buffer);
+
+        throw CreateException(buffer, "Invalid expression.", SyntaxTokenKind.Asterisk, SyntaxTokenKind.Slash, SyntaxTokenKind.Percent, SyntaxTokenKind.Plus,
+            SyntaxTokenKind.Minus, SyntaxTokenKind.ShiftLeft, SyntaxTokenKind.ShiftRight, SyntaxTokenKind.GreaterThan, SyntaxTokenKind.GreaterEquals,
+            SyntaxTokenKind.SmallerThan, SyntaxTokenKind.SmallerEquals, SyntaxTokenKind.EqualsEquals, SyntaxTokenKind.NotEquals, SyntaxTokenKind.Ampersand,
+            SyntaxTokenKind.Caret, SyntaxTokenKind.Pipe, SyntaxTokenKind.AndKeyword, SyntaxTokenKind.OrKeyword);
+    }
+
+    private bool IsCompoundExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return IsBinaryExpression(buffer) ||
+               IsLogicalExpression(buffer);
+    }
+
+    private bool IsBinaryExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.Asterisk) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Slash) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Percent) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Plus) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Minus) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ShiftLeft) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ShiftRight) ||
+               HasTokenKind(buffer, SyntaxTokenKind.GreaterThan) ||
+               HasTokenKind(buffer, SyntaxTokenKind.GreaterEquals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.SmallerThan) ||
+               HasTokenKind(buffer, SyntaxTokenKind.SmallerEquals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.EqualsEquals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.NotEquals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Ampersand) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Caret) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Pipe);
+    }
+
+    private bool IsLogicalExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.AndKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.OrKeyword);
+    }
+
+    private ExpressionSyntax ParseAtomicExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (IsNativeMethodInvocation(buffer))
+            return ParseNativeMethodInvocation(buffer);
+
+        if (IsLiteralExpression(buffer))
+        {
+            LiteralExpressionSyntax literal = ParseLiteralExpression(buffer);
+
+            if (IsArrayIndexExpression(buffer))
+                return ParseArrayIndexExpression(literal, buffer);
+
+            return literal;
+        }
+
+        if (IsParenthesizedExpression(buffer))
+            return ParseParenthesizedExpression(buffer);
+
+        throw CreateException(buffer, "Invalid atomic expression.", SyntaxTokenKind.StringLiteral,
+            SyntaxTokenKind.NumericLiteral, SyntaxTokenKind.ParenOpen);
+    }
+
+    private bool IsNativeMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ParenOpen);
+    }
+
+    private NativeMethodInvocationExpressionSyntax ParseNativeMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        LiteralExpressionSyntax name = ParseLiteralExpression(buffer);
+        var parameters = ParseNativeMethodInvocationParameters(buffer);
+
+        return new NativeMethodInvocationExpressionSyntax(name, parameters);
+    }
+
+    private NativeMethodInvocationParametersSyntax ParseNativeMethodInvocationParameters(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken parenOpen = ParseParenOpenToken(buffer);
+        var parameters = ParseNativeMethodParameters(buffer);
+        SyntaxToken parenClose = ParseParenCloseToken(buffer);
+
+        return new NativeMethodInvocationParametersSyntax(parenOpen, parameters, parenClose);
+    }
+
+    private CommaSeparatedSyntaxList<ExpressionSyntax>? ParseNativeMethodParameters(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (HasTokenKind(buffer, SyntaxTokenKind.ParenClose))
+            return null;
+
+        var result = new List<ExpressionSyntax>();
+
+        ExpressionSyntax parameter = ParseExpression(buffer);
+        result.Add(parameter);
+
+        while (HasTokenKind(buffer, SyntaxTokenKind.Comma))
+        {
+            SkipTokenKind(buffer, SyntaxTokenKind.Comma);
+
+            if (!IsLiteralExpression(buffer))
+                throw CreateException(buffer, "Invalid end of parameter list.");
+
+            parameter = ParseExpression(buffer);
+            result.Add(parameter);
+        }
+
+        return new CommaSeparatedSyntaxList<ExpressionSyntax>(result);
+    }
+
+    private bool IsArrayIndexExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.BracketOpen);
+    }
+
+    private ArrayIndexExpressionSyntax ParseArrayIndexExpression(ExpressionSyntax arrayExpression, IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var indexers = new List<ArrayIndexerExpressionSyntax>();
+
+        while (IsArrayIndexExpression(buffer))
+            indexers.Add(ParseArrayIndexerExpression(buffer));
+
+        return new ArrayIndexExpressionSyntax(arrayExpression, indexers);
+    }
+
+    private ArrayIndexerExpressionSyntax ParseArrayIndexerExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var bracketOpen = ParseBracketOpenToken(buffer);
+        var index = ParseExpression(buffer);
+        var bracketClose = ParseBracketCloseToken(buffer);
+
+        return new ArrayIndexerExpressionSyntax(bracketOpen, index, bracketClose);
+    }
+
+    private bool IsParenthesizedExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.ParenOpen);
+    }
+
+    private ParenthesizedExpressionSyntax ParseParenthesizedExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var parenOpen = ParseParenOpenToken(buffer);
+        var expression = ParseExpression(buffer);
+        var parenClose = ParseParenCloseToken(buffer);
+
+        return new ParenthesizedExpressionSyntax(parenOpen, expression, parenClose);
     }
 
     private bool IsLiteralExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return HasTokenKind(buffer, SyntaxTokenKind.TrueKeyword) ||
-               HasTokenKind(buffer, SyntaxTokenKind.FalseKeyword) || 
+               HasTokenKind(buffer, SyntaxTokenKind.FalseKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.NumericLiteral) ||
-               HasTokenKind(buffer, SyntaxTokenKind.UnsignedNumericLiteral) ||
-               HasTokenKind(buffer, SyntaxTokenKind.HashStringLiteral) ||
-               HasTokenKind(buffer, SyntaxTokenKind.HashNumericLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.FloatingNumericLiteral);
     }
 
@@ -401,6 +649,86 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return CreateToken(buffer, SyntaxTokenKind.Colon);
     }
 
+    private SyntaxToken ParseAsteriskToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Asterisk);
+    }
+
+    private SyntaxToken ParseSlashToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Slash);
+    }
+
+    private SyntaxToken ParsePercentToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Percent);
+    }
+
+    private SyntaxToken ParsePlusToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Plus);
+    }
+
+    private SyntaxToken ParseMinusToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Minus);
+    }
+
+    private SyntaxToken ParseShiftLeftToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ShiftLeft);
+    }
+
+    private SyntaxToken ParseShiftRightToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ShiftRight);
+    }
+
+    private SyntaxToken ParseGreaterThanToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.GreaterThan);
+    }
+
+    private SyntaxToken ParseGreaterEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.GreaterEquals);
+    }
+
+    private SyntaxToken ParseSmallerThanToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.SmallerThan);
+    }
+
+    private SyntaxToken ParseSmallerEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.SmallerEquals);
+    }
+
+    private SyntaxToken ParseEqualsEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.EqualsEquals);
+    }
+
+    private SyntaxToken ParseNotEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.NotEquals);
+    }
+
+    private SyntaxToken ParseAmpersandToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Ampersand);
+    }
+
+    private SyntaxToken ParseCaretToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Caret);
+    }
+
+    private SyntaxToken ParsePipeToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Pipe);
+    }
+
     private SyntaxToken ParseParenOpenToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.ParenOpen);
@@ -409,6 +737,16 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseParenCloseToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.ParenClose);
+    }
+
+    private SyntaxToken ParseBracketOpenToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.BracketOpen);
+    }
+
+    private SyntaxToken ParseBracketCloseToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.BracketClose);
     }
 
     private SyntaxToken ParseCurlyOpenToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -466,6 +804,26 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return CreateToken(buffer, SyntaxTokenKind.ContinueKeyword);
     }
 
+    private SyntaxToken ParseTrueKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.TrueKeyword);
+    }
+
+    private SyntaxToken ParseFalseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.FalseKeyword);
+    }
+
+    private SyntaxToken ParseAndKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.AndKeyword);
+    }
+
+    private SyntaxToken ParseOrKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.OrKeyword);
+    }
+
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.NumericLiteral);
@@ -479,16 +837,6 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseStringLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.StringLiteral);
-    }
-
-    private SyntaxToken ParseTrueKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
-    {
-        return CreateToken(buffer, SyntaxTokenKind.TrueKeyword);
-    }
-
-    private SyntaxToken ParseFalseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
-    {
-        return CreateToken(buffer, SyntaxTokenKind.FalseKeyword);
     }
 
     private SyntaxToken ParseIdentifierToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

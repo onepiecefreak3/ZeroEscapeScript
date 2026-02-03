@@ -64,6 +64,14 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         switch (statement)
         {
+            case AssignmentStatementSyntax assignment:
+                ComposeAssignmentStatement(assignment, sb);
+                break;
+
+            case NativeMethodInvocationStatementSyntax invocation:
+                ComposeNativeMethodInvocationStatement(invocation, sb);
+                break;
+
             case GotoLabelStatementSyntax gotoLabel:
                 ComposeGotoLabelStatement(gotoLabel, sb);
                 break;
@@ -118,6 +126,18 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         }
     }
 
+    private void ComposeAssignmentStatement(AssignmentStatementSyntax assignment, StringBuilder sb)
+    {
+        ComposeAssignmentExpression(assignment.Assignment, sb);
+        ComposeSyntaxToken(assignment.Semicolon, sb);
+    }
+
+    private void ComposeNativeMethodInvocationStatement(NativeMethodInvocationStatementSyntax invocation, StringBuilder sb)
+    {
+        ComposeNativeMethodInvocationExpression(invocation.Method, sb);
+        ComposeSyntaxToken(invocation.Semicolon, sb);
+    }
+
     private void ComposeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, StringBuilder sb)
     {
         ComposeLiteralExpression(gotoLabelStatement.Label, sb);
@@ -151,7 +171,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         ComposeSyntaxToken(ifStatement.If, sb);
         ComposeSyntaxToken(ifStatement.ParenOpen, sb);
-        ComposeLiteralExpression(ifStatement.Condition, sb);
+        ComposeExpression(ifStatement.Condition, sb);
         ComposeSyntaxToken(ifStatement.ParenClose, sb);
         ComposeBlock(ifStatement.Body, sb);
     }
@@ -160,7 +180,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         ComposeSyntaxToken(ifElseStatement.If, sb);
         ComposeSyntaxToken(ifElseStatement.ParenOpen, sb);
-        ComposeLiteralExpression(ifElseStatement.Condition, sb);
+        ComposeExpression(ifElseStatement.Condition, sb);
         ComposeSyntaxToken(ifElseStatement.ParenClose, sb);
         ComposeBlock(ifElseStatement.Body, sb);
         ComposeSyntaxToken(ifElseStatement.Else, sb);
@@ -172,7 +192,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(ifNotStatement.If, sb);
         ComposeSyntaxToken(ifNotStatement.Not, sb);
         ComposeSyntaxToken(ifNotStatement.ParenOpen, sb);
-        ComposeLiteralExpression(ifNotStatement.Condition, sb);
+        ComposeExpression(ifNotStatement.Condition, sb);
         ComposeSyntaxToken(ifNotStatement.ParenClose, sb);
         ComposeBlock(ifNotStatement.Body, sb);
     }
@@ -182,7 +202,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(ifNotElseStatement.If, sb);
         ComposeSyntaxToken(ifNotElseStatement.Not, sb);
         ComposeSyntaxToken(ifNotElseStatement.ParenOpen, sb);
-        ComposeLiteralExpression(ifNotElseStatement.Condition, sb);
+        ComposeExpression(ifNotElseStatement.Condition, sb);
         ComposeSyntaxToken(ifNotElseStatement.ParenClose, sb);
         ComposeBlock(ifNotElseStatement.Body, sb);
         ComposeSyntaxToken(ifNotElseStatement.Else, sb);
@@ -234,9 +254,14 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
 
     private void ComposeMethodInvocationStatement(MethodInvocationStatementSyntax invocation, StringBuilder sb)
     {
+        ComposeMethodInvocationExpression(invocation.Method, sb);
+        ComposeSyntaxToken(invocation.Semicolon, sb);
+    }
+
+    private void ComposeMethodInvocationExpression(MethodInvocationExpressionSyntax invocation, StringBuilder sb)
+    {
         ComposeName(invocation.Name, sb);
         ComposeMethodInvocationParameters(invocation.Parameters, sb);
-        ComposeSyntaxToken(invocation.Semicolon, sb);
     }
 
     private void ComposeMethodInvocationParameters(MethodInvocationParametersSyntax invocationParameters, StringBuilder sb)
@@ -246,9 +271,133 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(invocationParameters.ParenClose, sb);
     }
 
+    private void ComposeExpression(ExpressionSyntax expression, StringBuilder sb)
+    {
+        switch (expression)
+        {
+            case ParenthesizedExpressionSyntax parens:
+                ComposeParenthesizedExpression(parens, sb);
+                break;
+
+            case BinaryExpressionSyntax binary:
+                ComposeBinaryExpression(binary, sb);
+                break;
+
+            case LogicalExpressionSyntax logical:
+                ComposeLogicalExpression(logical, sb);
+                break;
+
+            case UnaryExpressionSyntax unary:
+                ComposeUnaryExpression(unary, sb);
+                break;
+
+            case LiteralExpressionSyntax literal:
+                ComposeLiteralExpression(literal, sb);
+                break;
+
+            case ArrayIndexExpressionSyntax arrayIndex:
+                ComposeArrayIndexExpression(arrayIndex, sb);
+                break;
+
+            case PostfixExpressionSyntax postfix:
+                ComposePostfixExpression(postfix, sb);
+                break;
+
+            case AssignmentExpressionSyntax assignment:
+                ComposeAssignmentExpression(assignment, sb);
+                break;
+
+            case NativeMethodInvocationExpressionSyntax invocation:
+                ComposeNativeMethodInvocationExpression(invocation, sb);
+                break;
+
+        }
+    }
+
+    private void ComposeParenthesizedExpression(ParenthesizedExpressionSyntax parens, StringBuilder sb)
+    {
+        ComposeSyntaxToken(parens.ParenOpen, sb);
+        ComposeExpression(parens.Expression, sb);
+        ComposeSyntaxToken(parens.ParenClose, sb);
+    }
+
+    private void ComposeBinaryExpression(BinaryExpressionSyntax binary, StringBuilder sb)
+    {
+        ComposeExpression(binary.Left, sb);
+        ComposeSyntaxToken(binary.Operation, sb);
+        ComposeExpression(binary.Right, sb);
+    }
+
+    private void ComposeLogicalExpression(LogicalExpressionSyntax logical, StringBuilder sb)
+    {
+        ComposeExpression(logical.Left, sb);
+        ComposeSyntaxToken(logical.Operation, sb);
+        ComposeExpression(logical.Right, sb);
+    }
+
+    private void ComposeUnaryExpression(UnaryExpressionSyntax unaryExpression, StringBuilder sb)
+    {
+        ComposeSyntaxToken(unaryExpression.Operation, sb);
+        ComposeExpression(unaryExpression.Expression, sb);
+    }
+
     private void ComposeLiteralExpression(LiteralExpressionSyntax literal, StringBuilder sb)
     {
         ComposeSyntaxToken(literal.Literal, sb);
+    }
+
+    private void ComposeArrayIndexExpression(ArrayIndexExpressionSyntax arrayIndex, StringBuilder sb)
+    {
+        ComposeExpression(arrayIndex.Value, sb);
+        foreach (var index in arrayIndex.Indexer)
+            ComposeArrayIndexerExpression(index, sb);
+    }
+
+    private void ComposePostfixExpression(PostfixExpressionSyntax postfixUnaryExpression, StringBuilder sb)
+    {
+        ComposeExpression(postfixUnaryExpression.Expression, sb);
+        ComposeSyntaxToken(postfixUnaryExpression.Operation, sb);
+    }
+
+    private void ComposeAssignmentExpression(AssignmentExpressionSyntax assignment, StringBuilder sb)
+    {
+        ComposeExpression(assignment.Left, sb);
+        ComposeSyntaxToken(assignment.Operator, sb);
+        ComposeExpression(assignment.Right, sb);
+    }
+
+    private void ComposeNativeMethodInvocationExpression(NativeMethodInvocationExpressionSyntax invocation, StringBuilder sb)
+    {
+        ComposeExpression(invocation.Name, sb);
+        ComposeNativeMethodInvocationParameters(invocation.Parameters, sb);
+    }
+
+    private void ComposeNativeMethodInvocationParameters(NativeMethodInvocationParametersSyntax parameters, StringBuilder sb)
+    {
+        ComposeSyntaxToken(parameters.ParenOpen, sb);
+        ComposeExpressions(parameters.ParameterList, sb);
+        ComposeSyntaxToken(parameters.ParenClose, sb);
+    }
+
+    private void ComposeExpressions(CommaSeparatedSyntaxList<ExpressionSyntax>? valueList, StringBuilder sb)
+    {
+        if (valueList == null || valueList.Elements.Count <= 0)
+            return;
+
+        for (var i = 0; i < valueList.Elements.Count - 1; i++)
+        {
+            ComposeExpression(valueList.Elements[i], sb);
+            ComposeSyntaxToken(syntaxFactory.Token(SyntaxTokenKind.Comma), sb);
+        }
+
+        ComposeExpression(valueList.Elements[^1], sb);
+    }
+
+    private void ComposeArrayIndexerExpression(ArrayIndexerExpressionSyntax indexer, StringBuilder sb)
+    {
+        ComposeSyntaxToken(indexer.BracketOpen, sb);
+        ComposeExpression(indexer.Index, sb);
+        ComposeSyntaxToken(indexer.BracketClose, sb);
     }
 
     private void ComposeName(NameSyntax name, StringBuilder sb)

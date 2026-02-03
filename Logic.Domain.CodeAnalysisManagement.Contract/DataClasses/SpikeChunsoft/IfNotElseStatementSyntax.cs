@@ -5,7 +5,7 @@ public class IfNotElseStatementSyntax : StatementSyntax
     public SyntaxToken If { get; private set; }
     public SyntaxToken Not { get; private set; }
     public SyntaxToken ParenOpen { get; private set; }
-    public LiteralExpressionSyntax Condition { get; private set; }
+    public ExpressionSyntax Condition { get; private set; }
     public SyntaxToken ParenClose { get; private set; }
     public BlockExpression Body { get; private set; }
     public SyntaxToken Else { get; private set; }
@@ -14,7 +14,7 @@ public class IfNotElseStatementSyntax : StatementSyntax
     public override SyntaxLocation Location => If.FullLocation;
     public override SyntaxSpan Span => new(If.FullSpan.Position, ElseBody.Span.EndPosition);
 
-    public IfNotElseStatementSyntax(SyntaxToken ifToken, SyntaxToken notToken, SyntaxToken parenOpen, LiteralExpressionSyntax condition,
+    public IfNotElseStatementSyntax(SyntaxToken ifToken, SyntaxToken notToken, SyntaxToken parenOpen, ExpressionSyntax condition,
         SyntaxToken parenClose, BlockExpression body, SyntaxToken elseToken, BlockExpression elseBody)
     {
         ifToken.Parent = this;

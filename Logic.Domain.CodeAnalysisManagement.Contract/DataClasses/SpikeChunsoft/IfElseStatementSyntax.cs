@@ -4,7 +4,7 @@ public class IfElseStatementSyntax : StatementSyntax
 {
     public SyntaxToken If { get; private set; }
     public SyntaxToken ParenOpen { get; private set; }
-    public LiteralExpressionSyntax Condition { get; private set; }
+    public ExpressionSyntax Condition { get; private set; }
     public SyntaxToken ParenClose { get; private set; }
     public BlockExpression Body { get; private set; }
     public SyntaxToken Else { get; private set; }
@@ -13,7 +13,7 @@ public class IfElseStatementSyntax : StatementSyntax
     public override SyntaxLocation Location => If.FullLocation;
     public override SyntaxSpan Span => new(If.FullSpan.Position, ElseBody.Span.EndPosition);
 
-    public IfElseStatementSyntax(SyntaxToken ifToken, SyntaxToken parenOpen, LiteralExpressionSyntax condition, SyntaxToken parenClose,
+    public IfElseStatementSyntax(SyntaxToken ifToken, SyntaxToken parenOpen, ExpressionSyntax condition, SyntaxToken parenClose,
         BlockExpression body, SyntaxToken elseToken, BlockExpression elseBody)
     {
         ifToken.Parent = this;
