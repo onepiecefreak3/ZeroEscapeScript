@@ -215,7 +215,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeBlock(doWhileStatement.Body, sb);
         ComposeSyntaxToken(doWhileStatement.While, sb);
         ComposeSyntaxToken(doWhileStatement.ParenOpen, sb);
-        ComposeLiteralExpression(doWhileStatement.Condition, sb);
+        ComposeExpression(doWhileStatement.Condition, sb);
         ComposeSyntaxToken(doWhileStatement.ParenClose, sb);
         ComposeSyntaxToken(doWhileStatement.Semicolon, sb);
     }
@@ -227,7 +227,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(doWhileNotStatement.While, sb);
         ComposeSyntaxToken(doWhileNotStatement.Not, sb);
         ComposeSyntaxToken(doWhileNotStatement.ParenOpen, sb);
-        ComposeLiteralExpression(doWhileNotStatement.Condition, sb);
+        ComposeExpression(doWhileNotStatement.Condition, sb);
         ComposeSyntaxToken(doWhileNotStatement.ParenClose, sb);
         ComposeSyntaxToken(doWhileNotStatement.Semicolon, sb);
     }
@@ -362,7 +362,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     private void ComposeAssignmentExpression(AssignmentExpressionSyntax assignment, StringBuilder sb)
     {
         ComposeExpression(assignment.Left, sb);
-        ComposeSyntaxToken(assignment.Operator, sb);
+        ComposeSyntaxToken(assignment.Operation, sb);
         ComposeExpression(assignment.Right, sb);
     }
 

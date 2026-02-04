@@ -6,7 +6,7 @@ public class DoWhileStatementSyntax : StatementSyntax
     public BlockExpression Body { get; private set; }
     public SyntaxToken While { get; private set; }
     public SyntaxToken ParenOpen { get; private set; }
-    public LiteralExpressionSyntax Condition { get; private set; }
+    public ExpressionSyntax Condition { get; private set; }
     public SyntaxToken ParenClose { get; private set; }
     public SyntaxToken Semicolon { get; private set; }
 
@@ -14,7 +14,7 @@ public class DoWhileStatementSyntax : StatementSyntax
     public override SyntaxSpan Span => new(Do.FullSpan.Position, Semicolon.FullSpan.EndPosition);
 
     public DoWhileStatementSyntax(SyntaxToken doToken, BlockExpression body, SyntaxToken whileToken, SyntaxToken parenOpen,
-        LiteralExpressionSyntax condition, SyntaxToken parenClose, SyntaxToken semicolon)
+        ExpressionSyntax condition, SyntaxToken parenClose, SyntaxToken semicolon)
     {
         doToken.Parent = this;
         body.Parent = this;

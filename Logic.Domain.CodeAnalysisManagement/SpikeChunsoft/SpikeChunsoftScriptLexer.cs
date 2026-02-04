@@ -40,7 +40,7 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                 if (IsPeekedChar(1, '='))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.EqualsEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
-                break;
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Equals, Position, Line, Column, $"{ReadChar()}");
 
             case '!':
                 if (IsPeekedChar(1, '='))
@@ -106,11 +106,17 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                 if (IsPeekedChar(1, '-'))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MinusMinus, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
+                if (IsPeekedChar(1, '='))
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MinusEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Minus, Position, Line, Column, $"{ReadChar()}");
 
             case '+':
                 if (IsPeekedChar(1, '+'))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.PlusPlus, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+
+                if (IsPeekedChar(1, '='))
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.PlusEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Plus, Position, Line, Column, $"{ReadChar()}");
 

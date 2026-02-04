@@ -145,11 +145,20 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private StatementSyntax ParseStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
+        if (IsAssignmentStatement(buffer))
+            return ParseAssignmentStatement(buffer);
+
+        if (IsNativeMethodInvocationStatement(buffer))
+            return ParseNativeMethodInvocationStatement(buffer);
+
+        if (IsGotoLabelStatement(buffer))
+            return ParseGotoLabelStatement(buffer);
+
+        if (IsMethodInvocation(buffer))
+            return ParseMethodInvocationStatement(buffer);
+
         if (HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword))
             return ParseReturnStatement(buffer);
-
-        if (HasTokenKind(buffer, SyntaxTokenKind.StringLiteral))
-            return ParseGotoLabelStatement(buffer);
 
         if (HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword))
             return ParseAsyncBlockStatement(buffer);
@@ -166,10 +175,43 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (HasTokenKind(buffer, SyntaxTokenKind.ContinueKeyword))
             return ParseContinueStatement(buffer);
 
-        if (IsMethodInvocation(buffer))
-            return ParseMethodInvocationStatement(buffer);
-
         throw CreateException(buffer, "Unknown statement.", SyntaxTokenKind.ReturnKeyword, SyntaxTokenKind.StringLiteral, SyntaxTokenKind.Identifier);
+    }
+
+    private bool IsAssignmentStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
+               (HasTokenKind(buffer, 1, SyntaxTokenKind.Equals) ||
+                HasTokenKind(buffer, 1, SyntaxTokenKind.PlusEquals) ||
+                HasTokenKind(buffer, 1, SyntaxTokenKind.MinusEquals));
+    }
+
+    private bool IsNativeMethodInvocationStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
+               HasTokenKind(buffer, 1, SyntaxTokenKind.ParenOpen);
+    }
+
+    private bool IsGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
+               HasTokenKind(buffer, 1, SyntaxTokenKind.Colon);
+    }
+
+    private AssignmentStatementSyntax ParseAssignmentStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var assignment = ParseAssignmentExpression(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new AssignmentStatementSyntax(assignment, semicolon);
+    }
+
+    private NativeMethodInvocationStatementSyntax ParseNativeMethodInvocationStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var invocation = ParseNativeMethodInvocationExpression(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new NativeMethodInvocationStatementSyntax(invocation, semicolon);
     }
 
     private ReturnStatementSyntax ParseReturnStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -203,7 +245,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (HasTokenKind(buffer, SyntaxTokenKind.NotKeyword))
             notToken = ParseNotKeywordToken(buffer);
         SyntaxToken parenOpen = ParseParenOpenToken(buffer);
-        LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
+        ExpressionSyntax condition = ParseExpression(buffer);
         SyntaxToken parenClose = ParseParenCloseToken(buffer);
         BlockExpression body = ParseBlockExpression(buffer);
 
@@ -233,7 +275,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (HasTokenKind(buffer, SyntaxTokenKind.NotKeyword))
             notToken = ParseNotKeywordToken(buffer);
         SyntaxToken parenOpen = ParseParenOpenToken(buffer);
-        LiteralExpressionSyntax condition = ParseLiteralExpression(buffer);
+        ExpressionSyntax condition = ParseExpression(buffer);
         SyntaxToken parenClose = ParseParenCloseToken(buffer);
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
@@ -328,10 +370,25 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private ExpressionSyntax ParseExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer, int minPrecedence = 0)
     {
-        ExpressionSyntax left = ParseAtomicExpression(buffer);
+        ExpressionSyntax left = ParseUnaryOrAtomicExpression(buffer);
+
+        if (left is LiteralExpressionSyntax && IsAssignmentOperation(buffer))
+            return ParseAssignmentExpression(left, buffer);
 
         while (IsCompoundExpression(buffer))
         {
+            SyntaxToken operatorToken;
+
+            if (IsPostfixExpression(buffer))
+            {
+                if (minPrecedence > 11)
+                    break;
+
+                operatorToken = ParsePostfixOperatorToken(buffer);
+                left = new PostfixExpressionSyntax(left, operatorToken);
+                continue;
+            }
+
             int currentPrecedence = _tokenPrecedence[buffer.Peek().Kind];
 
             if (currentPrecedence < minPrecedence)
@@ -340,7 +397,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
             bool isBinary = IsBinaryExpression(buffer);
             bool isLogical = IsLogicalExpression(buffer);
 
-            SyntaxToken operatorToken = ParseOperatorToken(buffer);
+            operatorToken = ParseOperatorToken(buffer);
             int newMinPrecedence = currentPrecedence + 1;
 
             ExpressionSyntax right = ParseExpression(buffer, newMinPrecedence);
@@ -352,6 +409,19 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         }
 
         return left;
+    }
+
+    private ExpressionSyntax ParseUnaryOrAtomicExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (IsUnaryExpression(buffer))
+        {
+            SyntaxToken operatorToken = ParseUnaryOperatorToken(buffer);
+            ExpressionSyntax expression = ParseExpression(buffer, 10);
+
+            return new UnaryExpressionSyntax(operatorToken, expression);
+        }
+
+        return ParseAtomicExpression(buffer);
     }
 
     private SyntaxToken ParseOperatorToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -416,10 +486,56 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
             SyntaxTokenKind.Caret, SyntaxTokenKind.Pipe, SyntaxTokenKind.AndKeyword, SyntaxTokenKind.OrKeyword);
     }
 
+    private SyntaxToken ParseUnaryOperatorToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (HasTokenKind(buffer, SyntaxTokenKind.PlusPlus))
+            return ParsePlusPlusToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.MinusMinus))
+            return ParseMinusMinusToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.ExclamationPoint))
+            return ParseExclamationPointToken(buffer);
+
+        throw CreateException(buffer, "Invalid unary expression.", SyntaxTokenKind.PlusPlus, SyntaxTokenKind.MinusMinus, SyntaxTokenKind.ExclamationPoint);
+    }
+
+    private SyntaxToken ParsePostfixOperatorToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        if (HasTokenKind(buffer, SyntaxTokenKind.PlusPlus))
+            return ParsePlusPlusToken(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.MinusMinus))
+            return ParseMinusMinusToken(buffer);
+
+        throw CreateException(buffer, "Invalid postfix expression.", SyntaxTokenKind.PlusPlus, SyntaxTokenKind.MinusMinus);
+    }
+
+    private bool IsAssignmentOperation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.Equals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.PlusEquals) ||
+               HasTokenKind(buffer, SyntaxTokenKind.MinusEquals);
+    }
+
     private bool IsCompoundExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return IsBinaryExpression(buffer) ||
-               IsLogicalExpression(buffer);
+               IsLogicalExpression(buffer) ||
+               IsPostfixExpression(buffer);
+    }
+
+    private bool IsUnaryExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.PlusPlus) ||
+               HasTokenKind(buffer, SyntaxTokenKind.MinusMinus) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ExclamationPoint);
+    }
+
+    private bool IsPostfixExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.PlusPlus) ||
+               HasTokenKind(buffer, SyntaxTokenKind.MinusMinus);
     }
 
     private bool IsBinaryExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -451,7 +567,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private ExpressionSyntax ParseAtomicExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         if (IsNativeMethodInvocation(buffer))
-            return ParseNativeMethodInvocation(buffer);
+            return ParseNativeMethodInvocationExpression(buffer);
 
         if (IsLiteralExpression(buffer))
         {
@@ -472,11 +588,34 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private bool IsNativeMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
-               HasTokenKind(buffer, SyntaxTokenKind.ParenOpen);
+        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
+               HasTokenKind(buffer, 1, SyntaxTokenKind.ParenOpen);
     }
 
-    private NativeMethodInvocationExpressionSyntax ParseNativeMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    private AssignmentExpressionSyntax ParseAssignmentExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var left = ParseLiteralExpression(buffer);
+
+        return ParseAssignmentExpression(left, buffer);
+    }
+
+    private AssignmentExpressionSyntax ParseAssignmentExpression(ExpressionSyntax left, IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken operatorToken;
+        if (HasTokenKind(buffer, SyntaxTokenKind.Equals))
+            operatorToken = ParseEqualsToken(buffer);
+        else if (HasTokenKind(buffer, SyntaxTokenKind.PlusEquals))
+            operatorToken = ParsePlusEqualsToken(buffer);
+        else if (HasTokenKind(buffer, SyntaxTokenKind.MinusEquals))
+            operatorToken = ParseMinusEqualsToken(buffer);
+        else
+            throw CreateException(buffer, "Invalid assignment operation.", SyntaxTokenKind.Equals, SyntaxTokenKind.PlusEquals,
+                SyntaxTokenKind.MinusEquals);
+
+        return new AssignmentExpressionSyntax(left, operatorToken, ParseExpression(buffer));
+    }
+
+    private NativeMethodInvocationExpressionSyntax ParseNativeMethodInvocationExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         LiteralExpressionSyntax name = ParseLiteralExpression(buffer);
         var parameters = ParseNativeMethodInvocationParameters(buffer);
@@ -674,6 +813,21 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return CreateToken(buffer, SyntaxTokenKind.Minus);
     }
 
+    private SyntaxToken ParsePlusPlusToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.PlusPlus);
+    }
+
+    private SyntaxToken ParseMinusMinusToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.MinusMinus);
+    }
+
+    private SyntaxToken ParseExclamationPointToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ExclamationPoint);
+    }
+
     private SyntaxToken ParseShiftLeftToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.ShiftLeft);
@@ -712,6 +866,21 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseNotEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.NotEquals);
+    }
+
+    private SyntaxToken ParseEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.Equals);
+    }
+
+    private SyntaxToken ParsePlusEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.PlusEquals);
+    }
+
+    private SyntaxToken ParseMinusEqualsToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.MinusEquals);
     }
 
     private SyntaxToken ParseAmpersandToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

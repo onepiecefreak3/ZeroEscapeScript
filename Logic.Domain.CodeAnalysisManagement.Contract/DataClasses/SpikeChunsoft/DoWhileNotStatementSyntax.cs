@@ -7,7 +7,7 @@ public class DoWhileNotStatementSyntax : StatementSyntax
     public SyntaxToken While { get; private set; }
     public SyntaxToken Not { get; private set; }
     public SyntaxToken ParenOpen { get; private set; }
-    public LiteralExpressionSyntax Condition { get; private set; }
+    public ExpressionSyntax Condition { get; private set; }
     public SyntaxToken ParenClose { get; private set; }
     public SyntaxToken Semicolon { get; private set; }
 
@@ -15,7 +15,7 @@ public class DoWhileNotStatementSyntax : StatementSyntax
     public override SyntaxSpan Span => new(Do.FullSpan.Position, Semicolon.FullSpan.EndPosition);
 
     public DoWhileNotStatementSyntax(SyntaxToken doToken, BlockExpression body, SyntaxToken whileToken, SyntaxToken notToken,
-        SyntaxToken parenOpen, LiteralExpressionSyntax condition, SyntaxToken parenClose, SyntaxToken semicolon)
+        SyntaxToken parenOpen, ExpressionSyntax condition, SyntaxToken parenClose, SyntaxToken semicolon)
     {
         doToken.Parent = this;
         body.Parent = this;

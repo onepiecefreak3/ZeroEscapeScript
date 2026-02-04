@@ -375,7 +375,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(doWhileStatement.Condition, ctx);
+        NormalizeExpression(doWhileStatement.Condition, ctx);
     }
 
     private void NormalizeDoWhileNotStatement(DoWhileNotStatementSyntax doWhileNotStatement, WhitespaceNormalizeContext ctx)
@@ -406,7 +406,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(doWhileNotStatement.Condition, ctx);
+        NormalizeExpression(doWhileNotStatement.Condition, ctx);
     }
 
     private void NormalizeBreakStatement(BreakStatementSyntax breakStatement, WhitespaceNormalizeContext ctx)
@@ -606,7 +606,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeAssignmentExpression(AssignmentExpressionSyntax assignmentExpression, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken newOperator = assignmentExpression.Operator.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+        SyntaxToken newOperator = assignmentExpression.Operation.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
 
         ctx.ShouldIndent = true;
         ctx.ShouldLineBreak = false;

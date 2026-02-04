@@ -21,49 +21,6 @@ class ExtractFsbWorkflow(
         // Read script data
         Sir0Script script = scriptParser.Parse(input);
 
-        //foreach (var function in script.Functions)
-        //{
-        //    Sir0Operation? functionNameOperation = null;
-        //    for (var i = 0; i < function.Operations.Length; i++)
-        //    {
-        //        var operation = function.Operations[i];
-        //        if (operation.Command is not 36 and not 35)
-        //            continue;
-
-        //        if (operation.Command is 35)
-        //        {
-        //            if (i - 1 < 0)
-        //                continue;
-
-        //            functionNameOperation = function.Operations[i - 1];
-        //            continue;
-        //        }
-
-        //        if (functionNameOperation is null)
-        //            continue;
-
-        //        string name = functionNameOperation.Arguments.Length != 2
-        //            ? (string)functionNameOperation.Arguments[0]
-        //            : (string)functionNameOperation.Arguments[0] + "::" + (string)functionNameOperation.Arguments[1];
-
-        //        if (i + 1 >= function.Operations.Length || function.Operations[i + 1].Command is not 39)
-        //        {
-        //            if (!_invocationLookup.TryGetValue(function.Operations[i + 1].Command, out var lookup))
-        //                _invocationLookup[function.Operations[i + 1].Command] = lookup = [];
-
-        //            lookup.Add(name);
-        //            continue;
-        //        }
-
-        //        if (!_invocationLookup.TryGetValue(39, out var lookup1))
-        //            _invocationLookup[39] = lookup1 = [];
-
-        //        lookup1.Add(name);
-
-        //        // '?' or '@' or ':' or '~'or '^' or '$' or '&'
-        //    }
-        //}
-
         // Convert to readable script
         CodeUnitSyntax codeUnit = scriptConverter.CreateCodeUnit(script.Functions);
         scriptNormalizer.NormalizeCodeUnit(codeUnit);
