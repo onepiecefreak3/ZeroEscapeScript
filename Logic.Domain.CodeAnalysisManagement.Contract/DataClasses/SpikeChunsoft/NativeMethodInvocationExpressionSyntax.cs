@@ -2,13 +2,13 @@
 
 public class NativeMethodInvocationExpressionSyntax : ExpressionSyntax
 {
-    public LiteralExpressionSyntax Name { get; private set; }
+    public ExpressionSyntax Name { get; private set; }
     public NativeMethodInvocationParametersSyntax Parameters { get; private set; }
 
     public override SyntaxLocation Location => Name.Location;
     public override SyntaxSpan Span => new(Name.Span.Position, Parameters.Span.EndPosition);
 
-    public NativeMethodInvocationExpressionSyntax(LiteralExpressionSyntax name, NativeMethodInvocationParametersSyntax parameters)
+    public NativeMethodInvocationExpressionSyntax(ExpressionSyntax name, NativeMethodInvocationParametersSyntax parameters)
     {
         name.Parent = this;
         parameters.Parent = this;
@@ -19,7 +19,7 @@ public class NativeMethodInvocationExpressionSyntax : ExpressionSyntax
         Root.Update();
     }
 
-    public void SetName(LiteralExpressionSyntax name, bool updatePosition = true)
+    public void SetName(ExpressionSyntax name, bool updatePosition = true)
     {
         name.Parent = this;
 

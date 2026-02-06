@@ -21,6 +21,7 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
             case SyntaxTokenKind.Colon: return new(":", (int)kind);
             case SyntaxTokenKind.Semicolon: return new(";", (int)kind);
             case SyntaxTokenKind.ExclamationPoint: return new("!", (int)kind);
+            case SyntaxTokenKind.ColonColon: return new("::", (int)kind);
 
             case SyntaxTokenKind.Asterisk: return new("*", (int)kind);
             case SyntaxTokenKind.Slash: return new("/", (int)kind);

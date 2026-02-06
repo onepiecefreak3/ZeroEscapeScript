@@ -14,8 +14,6 @@ class ExtractFsbWorkflow(
     ISpikeChunsoftScriptComposer scriptComposer)
     : IExtractFsbWorkflow
 {
-    //private readonly Dictionary<int, HashSet<string>> _invocationLookup = [];
-
     public void Extract(Stream input, Stream output)
     {
         // Read script data

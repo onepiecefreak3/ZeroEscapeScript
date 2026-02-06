@@ -72,6 +72,10 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
                 ComposeNativeMethodInvocationStatement(invocation, sb);
                 break;
 
+            case PostfixStatementSyntax postfix:
+                ComposePostfixStatement(postfix, sb);
+                break;
+
             case GotoLabelStatementSyntax gotoLabel:
                 ComposeGotoLabelStatement(gotoLabel, sb);
                 break;
@@ -138,6 +142,12 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(invocation.Semicolon, sb);
     }
 
+    private void ComposePostfixStatement(PostfixStatementSyntax postfix, StringBuilder sb)
+    {
+        ComposePostfixExpression(postfix.Postfix, sb);
+        ComposeSyntaxToken(postfix.Semicolon, sb);
+    }
+
     private void ComposeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, StringBuilder sb)
     {
         ComposeLiteralExpression(gotoLabelStatement.Label, sb);
@@ -159,12 +169,25 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
 
     private void ComposeBlock(BlockExpression blockExpression, StringBuilder sb)
     {
+        if (IsInlineBlock(blockExpression))
+        {
+            foreach (StatementSyntax expression in blockExpression.Statements)
+                ComposeStatement(expression, sb);
+            return;
+        }
+
         ComposeSyntaxToken(blockExpression.CurlyOpen, sb);
 
         foreach (StatementSyntax expression in blockExpression.Statements)
             ComposeStatement(expression, sb);
 
         ComposeSyntaxToken(blockExpression.CurlyClose, sb);
+    }
+
+    private static bool IsInlineBlock(BlockExpression blockExpression)
+    {
+        return string.IsNullOrEmpty(blockExpression.CurlyOpen.Text) &&
+               string.IsNullOrEmpty(blockExpression.CurlyClose.Text);
     }
 
     private void ComposeIfStatement(IfStatementSyntax ifStatement, StringBuilder sb)
@@ -275,6 +298,10 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         switch (expression)
         {
+            case MemberAccessExpressionSyntax memberAccess:
+                ComposeMemberAccessExpression(memberAccess, sb);
+                break;
+
             case ParenthesizedExpressionSyntax parens:
                 ComposeParenthesizedExpression(parens, sb);
                 break;
@@ -312,6 +339,13 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
                 break;
 
         }
+    }
+
+    private void ComposeMemberAccessExpression(MemberAccessExpressionSyntax memberAccess, StringBuilder sb)
+    {
+        ComposeExpression(memberAccess.Eval, sb);
+        ComposeSyntaxToken(memberAccess.Operator, sb);
+        ComposeSyntaxToken(memberAccess.Identifier, sb);
     }
 
     private void ComposeParenthesizedExpression(ParenthesizedExpressionSyntax parens, StringBuilder sb)

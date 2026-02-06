@@ -32,10 +32,14 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
         {
             case ',':
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Comma, Position, Line, Column, $"{ReadChar()}");
-            case ':':
-                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Colon, Position, Line, Column, $"{ReadChar()}");
             case ';':
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Semicolon, Position, Line, Column, $"{ReadChar()}");
+            case ':':
+                if (IsPeekedChar(1, ':'))
+                    return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ColonColon, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
+
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Colon, Position, Line, Column, $"{ReadChar()}");
+
             case '=':
                 if (IsPeekedChar(1, '='))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.EqualsEquals, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
@@ -100,9 +104,6 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Caret, Position, Line, Column, $"{ReadChar()}");
 
             case '-':
-                if (IsPeekedChar(1, '.') || (TryPeekChar(1, out character) && character is >= '0' and <= '9'))
-                    goto case '.';
-
                 if (IsPeekedChar(1, '-'))
                     return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.MinusMinus, Position, Line, Column, $"{ReadChar()}{ReadChar()}");
 

@@ -127,6 +127,9 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
                         case AssignmentExpressionSyntax assignment:
                             return CreateAssignmentStatement(assignment);
+
+                        case PostfixExpressionSyntax postfix:
+                            return CreatePostfixStatement(postfix);
                     }
 
                     throw new InvalidOperationException("Could not create statement from expression.");
@@ -180,6 +183,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
                 expression = CreateLogicalExpression(expressionStack, operation.Command);
                 break;
 
+            case 0x01:
             case 0x07:
             case 0x08:
             case 0x09:
@@ -204,9 +208,19 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
                 break;
 
             case 0xF4:
-                expression = operation.Arguments.Length is 1
-                    ? CreateStringLiteralExpression((string)operation.Arguments[0])
-                    : CreateStringLiteralExpression((string)operation.Arguments[0] + "::" + (string)operation.Arguments[1]);
+                if (operation.Arguments.Length is 1)
+                {
+                    expression = CreateStringLiteralExpression((string)operation.Arguments[0]);
+                    break;
+                }
+
+                if (operation.Arguments[0] is not "?_eval_")
+                {
+                    expression = CreateStringLiteralExpression((string)operation.Arguments[0] + "::" + (string)operation.Arguments[1]);
+                    break;
+                }
+
+                expression = CreateMemberAccessExpression(expressionStack, (string)operation.Arguments[1]);
                 break;
 
             case 0x20:
@@ -393,6 +407,10 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         SyntaxToken operatorToken;
         switch (command)
         {
+            case 0x01:
+                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Minus);
+                break;
+
             case 0x07:
                 operatorToken = syntaxFactory.Token(SyntaxTokenKind.ExclamationPoint);
                 break;
@@ -494,11 +512,20 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private NativeMethodInvocationExpressionSyntax CreateNativeMethodInvocationExpression(Stack<ExpressionSyntax> syntax, Stack<ExpressionSyntax> args)
     {
         ExpressionSyntax nameExpression = syntax.Pop();
-
-        if (nameExpression is not LiteralExpressionSyntax literal || literal.Literal.RawKind != (int)SyntaxTokenKind.StringLiteral)
+        
+        if (nameExpression is not MemberAccessExpressionSyntax && (nameExpression is not LiteralExpressionSyntax literal || literal.Literal.RawKind != (int)SyntaxTokenKind.StringLiteral))
             throw new InvalidOperationException("Need method name for invocation.");
 
-        return new NativeMethodInvocationExpressionSyntax(literal, CreateNativeMethodInvocationParameters([.. args.Reverse()]));
+        return new NativeMethodInvocationExpressionSyntax(nameExpression, CreateNativeMethodInvocationParameters([.. args.Reverse()]));
+    }
+
+    private MemberAccessExpressionSyntax CreateMemberAccessExpression(Stack<ExpressionSyntax> syntax, string name)
+    {
+        var left = CreateParenthesizedExpression(syntax.Pop());
+        SyntaxToken operatorToken = syntaxFactory.Token(SyntaxTokenKind.ColonColon);
+        SyntaxToken identifier = syntaxFactory.Identifier(name);
+
+        return new MemberAccessExpressionSyntax(left, operatorToken, identifier);
     }
 
     private AssignmentStatementSyntax CreateAssignmentStatement(AssignmentExpressionSyntax assignment)
@@ -506,6 +533,13 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new AssignmentStatementSyntax(assignment, semicolon);
+    }
+
+    private PostfixStatementSyntax CreatePostfixStatement(PostfixExpressionSyntax postfix)
+    {
+        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new PostfixStatementSyntax(postfix, semicolon);
     }
 
     private GotoStatementSyntax CreateGotoStatement(string jumpLabel)
@@ -890,6 +924,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             {
                 result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
                 AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Continue, condition);
+
                 return result;
             }
 
@@ -897,6 +932,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             {
                 result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
                 AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Break, condition);
+
                 return result;
             }
         }
@@ -944,7 +980,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
         BlockExpression body = CreateBlockExpression(thenStatements);
         SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
-        BlockExpression elseBody = CreateBlockExpression(elseStatements);
+        BlockExpression elseBody = CreateElseBlockExpression(elseStatements);
 
         return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
     }
@@ -969,7 +1005,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
         BlockExpression body = CreateBlockExpression(thenStatements);
         SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
-        BlockExpression elseBody = CreateBlockExpression(elseStatements);
+        BlockExpression elseBody = CreateElseBlockExpression(elseStatements);
 
         return new IfNotElseStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
     }
@@ -1019,6 +1055,33 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     {
         SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+
+        return new BlockExpression(curlyOpen, statements, curlyClose);
+    }
+
+    private BlockExpression CreateElseBlockExpression(IReadOnlyList<StatementSyntax> statements)
+    {
+        if (IsElseIfCandidate(statements))
+            return CreateInlineBlockExpression(statements);
+
+        return CreateBlockExpression(statements);
+    }
+
+    private static bool IsElseIfCandidate(IReadOnlyList<StatementSyntax> statements)
+    {
+        if (statements.Count != 1)
+            return false;
+
+        return statements[0] is IfStatementSyntax
+            or IfNotStatementSyntax
+            or IfElseStatementSyntax
+            or IfNotElseStatementSyntax;
+    }
+
+    private BlockExpression CreateInlineBlockExpression(IReadOnlyList<StatementSyntax> statements)
+    {
+        SyntaxToken curlyOpen = syntaxFactory.Create(string.Empty, (int)SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyClose = syntaxFactory.Create(string.Empty, (int)SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, statements, curlyClose);
     }

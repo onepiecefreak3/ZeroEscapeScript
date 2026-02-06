@@ -105,6 +105,10 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeNativeMethodInvocationStatement(invocation, ctx);
                 break;
 
+            case PostfixStatementSyntax postfix:
+                NormalizePostfixStatement(postfix, ctx);
+                break;
+
             case GotoLabelStatementSyntax gotoLabel:
                 NormalizeGotoLabelStatement(gotoLabel, ctx);
                 break;
@@ -181,6 +185,18 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         NormalizeNativeMethodInvocationExpression(invocationStatement.Method, ctx);
 
         invocationStatement.SetSemicolon(newSemicolon, false);
+    }
+
+    private void NormalizePostfixStatement(PostfixStatementSyntax postfixStatement, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken newSemicolon = postfixStatement.Semicolon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            newSemicolon = newSemicolon.WithTrailingTrivia("\r\n");
+
+        NormalizePostfixExpression(postfixStatement.Postfix, ctx);
+
+        postfixStatement.SetSemicolon(newSemicolon, false);
     }
 
     private void NormalizeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, WhitespaceNormalizeContext ctx)
@@ -265,6 +281,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ifStatement.SetParenOpen(parenOpen, false);
         ifStatement.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = true;
         NormalizeBlock(ifStatement.Body, ctx, "\r\n");
 
         ctx.IsFirstElement = true;
@@ -275,12 +292,16 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeIfElseStatement(IfElseStatementSyntax ifElseStatement, WhitespaceNormalizeContext ctx)
     {
-        string? leadingTrivia = null;
+        string? ifLeadingTrivia = null;
         if (ctx is { ShouldIndent: true, Indent: > 0 })
-            leadingTrivia = new string('\t', ctx.Indent);
+            ifLeadingTrivia = new string('\t', ctx.Indent);
 
-        SyntaxToken ifToken = ifElseStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
-        SyntaxToken elseToken = ifElseStatement.Else.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        string? elseLeadingTrivia = null;
+        if (ctx is { Indent: > 0 })
+            elseLeadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken ifToken = ifElseStatement.If.WithLeadingTrivia(ifLeadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken elseToken = ifElseStatement.Else.WithLeadingTrivia(elseLeadingTrivia).WithTrailingTrivia("\r\n");
         SyntaxToken parenOpen = ifElseStatement.ParenOpen.WithNoTrivia();
         SyntaxToken parenClose = ifElseStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
 
@@ -289,8 +310,20 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ifElseStatement.SetParenOpen(parenOpen, false);
         ifElseStatement.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = true;
+
         NormalizeBlock(ifElseStatement.Body, ctx, "\r\n");
-        NormalizeBlock(ifElseStatement.ElseBody, ctx, "\r\n");
+        if (IsInlineBlock(ifElseStatement.ElseBody))
+        {
+            elseToken = elseToken.WithTrailingTrivia(" ");
+            ifElseStatement.SetElse(elseToken, false);
+
+            NormalizeInlineBlock(ifElseStatement.ElseBody, ctx);
+        }
+        else
+        {
+            NormalizeBlock(ifElseStatement.ElseBody, ctx, "\r\n");
+        }
 
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
@@ -314,6 +347,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ifNotStatement.SetParenOpen(parenOpen, false);
         ifNotStatement.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = true;
         NormalizeBlock(ifNotStatement.Body, ctx, "\r\n");
 
         ctx.IsFirstElement = true;
@@ -328,9 +362,13 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         if (ctx is { ShouldIndent: true, Indent: > 0 })
             leadingTrivia = new string('\t', ctx.Indent);
 
+        string? elseLeadingTrivia = null;
+        if (ctx is { Indent: > 0 })
+            elseLeadingTrivia = new string('\t', ctx.Indent);
+
         SyntaxToken ifToken = ifNotElseStatement.If.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
         SyntaxToken notToken = ifNotElseStatement.Not.WithNoTrivia().WithTrailingTrivia(" ");
-        SyntaxToken elseToken = ifNotElseStatement.Else.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken elseToken = ifNotElseStatement.Else.WithLeadingTrivia(elseLeadingTrivia).WithTrailingTrivia("\r\n");
         SyntaxToken parenOpen = ifNotElseStatement.ParenOpen.WithNoTrivia();
         SyntaxToken parenClose = ifNotElseStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
 
@@ -340,8 +378,20 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ifNotElseStatement.SetParenOpen(parenOpen, false);
         ifNotElseStatement.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = true;
+
         NormalizeBlock(ifNotElseStatement.Body, ctx, "\r\n");
-        NormalizeBlock(ifNotElseStatement.ElseBody, ctx, "\r\n");
+        if (IsInlineBlock(ifNotElseStatement.ElseBody))
+        {
+            elseToken = elseToken.WithTrailingTrivia(" ");
+            ifNotElseStatement.SetElse(elseToken, false);
+
+            NormalizeInlineBlock(ifNotElseStatement.ElseBody, ctx);
+        }
+        else
+        {
+            NormalizeBlock(ifNotElseStatement.ElseBody, ctx, "\r\n");
+        }
 
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
@@ -441,6 +491,12 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeBlock(BlockExpression methodDeclarationBody, WhitespaceNormalizeContext ctx, string? trailingTrivia)
     {
+        if (IsInlineBlock(methodDeclarationBody))
+        {
+            NormalizeInlineBlock(methodDeclarationBody, ctx);
+            return;
+        }
+
         string? leadingTrivia = null;
         if (ctx is { ShouldIndent: true, Indent: > 0 })
             leadingTrivia = new string('\t', ctx.Indent);
@@ -460,6 +516,30 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
             NormalizeStatement(expression, ctx);
         }
+    }
+
+    private void NormalizeInlineBlock(BlockExpression blockExpression, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken curlyOpen = blockExpression.CurlyOpen.WithNoTrivia();
+        SyntaxToken curlyClose = blockExpression.CurlyClose.WithNoTrivia();
+
+        blockExpression.SetCurlyOpen(curlyOpen, false);
+        blockExpression.SetCurlyClose(curlyClose, false);
+
+        foreach (StatementSyntax expression in blockExpression.Statements)
+        {
+            ctx.IsFirstElement = blockExpression.Statements[0] == expression;
+            ctx.ShouldLineBreak = false;
+            ctx.ShouldIndent = false;
+
+            NormalizeStatement(expression, ctx);
+        }
+    }
+
+    private static bool IsInlineBlock(BlockExpression blockExpression)
+    {
+        return string.IsNullOrEmpty(blockExpression.CurlyOpen.Text) &&
+               string.IsNullOrEmpty(blockExpression.CurlyClose.Text);
     }
 
     private void NormalizeMethodInvocationStatement(MethodInvocationStatementSyntax invocation, WhitespaceNormalizeContext ctx)
@@ -498,6 +578,10 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         switch (expression)
         {
+            case MemberAccessExpressionSyntax memberAccess:
+                NormalizeMemberAccessExpression(memberAccess, ctx);
+                break;
+
             case ParenthesizedExpressionSyntax parens:
                 NormalizeParenthesizedExpression(parens, ctx);
                 break;
@@ -536,14 +620,30 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         }
     }
 
+    private void NormalizeMemberAccessExpression(MemberAccessExpressionSyntax memberAccess, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken operatorToken = memberAccess.Operator.WithNoTrivia();
+        SyntaxToken identifier = memberAccess.Identifier.WithNoTrivia();
+
+        memberAccess.SetOperator(operatorToken, false);
+        memberAccess.SetIdentifier(identifier, false);
+
+        NormalizeParenthesizedExpression(memberAccess.Eval, ctx);
+    }
+
     private void NormalizeParenthesizedExpression(ParenthesizedExpressionSyntax parens, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken parenOpen = parens.ParenOpen.WithNoTrivia();
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken parenOpen = parens.ParenOpen.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(null);
         SyntaxToken parenClose = parens.ParenClose.WithNoTrivia();
 
         parens.SetParenOpen(parenOpen, false);
         parens.SetParenClose(parenClose, false);
 
+        ctx.ShouldIndent = false;
         NormalizeExpression(parens.Expression, ctx);
     }
 
@@ -569,7 +669,11 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeUnaryExpression(UnaryExpressionSyntax unaryExpression, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken operation = unaryExpression.Operation.WithNoTrivia();
+        string? leadingTrivia = null;
+        if (!ctx.IsFirstElement)
+            leadingTrivia += " ";
+
+        SyntaxToken operation = unaryExpression.Operation.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(null);
 
         ctx.IsFirstElement = true;
         NormalizeExpression(unaryExpression.Expression, ctx);
@@ -625,7 +729,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
         ctx.IsFirstElement = true;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(invocation.Name, ctx);
+        NormalizeExpression(invocation.Name, ctx);
     }
 
     private void NormalizeNativeMethodInvocationParameters(NativeMethodInvocationParametersSyntax invocationParameters, WhitespaceNormalizeContext ctx)

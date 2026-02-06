@@ -7,6 +7,7 @@ public enum SyntaxTokenKind
     Colon,
     Semicolon,
     ExclamationPoint,
+    ColonColon,
 
     Asterisk,
     Slash,
