@@ -785,7 +785,10 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             if (TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition, out StatementSyntax? ifStatement,
                     out int nextIndex))
             {
-                result.Add(ifStatement);
+                if (TryMergeLoopControlIf(result, ifStatement, out StatementSyntax mergedStatement))
+                    result[^1] = mergedStatement;
+                else
+                    result.Add(ifStatement);
                 i = nextIndex;
                 continue;
             }
@@ -1084,6 +1087,56 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         SyntaxToken curlyClose = syntaxFactory.Create(string.Empty, (int)SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, statements, curlyClose);
+    }
+
+    private bool TryMergeLoopControlIf(List<StatementSyntax> statements, StatementSyntax ifStatement, out StatementSyntax mergedStatement)
+    {
+        mergedStatement = ifStatement;
+        if (statements.Count == 0)
+            return false;
+
+        if (statements[^1] is not IfElseStatementSyntax controlIf)
+            return false;
+
+        if (!IsEmptyBlock(controlIf.Body))
+            return false;
+
+        if (!TryGetLoopControlStatement(controlIf.ElseBody, out StatementSyntax loopControl))
+            return false;
+
+        if (ifStatement is not IfStatementSyntax ifOnlyStatement)
+            return false;
+
+        if (!ReferenceEquals(controlIf.Condition, ifOnlyStatement.Condition))
+            return false;
+
+        mergedStatement = CreateIfElseStatement(ifOnlyStatement.Body.Statements, [loopControl], controlIf.Condition);
+        return true;
+    }
+
+    private static bool IsEmptyBlock(BlockExpression blockExpression)
+    {
+        return blockExpression.Statements.Count == 0;
+    }
+
+    private bool TryGetLoopControlStatement(BlockExpression elseBody, out StatementSyntax loopControl)
+    {
+        loopControl = null!;
+        if (elseBody.Statements.Count != 1)
+            return false;
+
+        return elseBody.Statements[0] switch
+        {
+            BreakStatementSyntax => TryCreateLoopControlStatement(LoopControlKind.Break, out loopControl),
+            ContinueStatementSyntax => TryCreateLoopControlStatement(LoopControlKind.Continue, out loopControl),
+            _ => false
+        };
+    }
+
+    private bool TryCreateLoopControlStatement(LoopControlKind kind, out StatementSyntax loopControl)
+    {
+        loopControl = kind == LoopControlKind.Break ? CreateBreakStatement() : CreateContinueStatement();
+        return true;
     }
 
     private void AddLoopControlStatements(List<StatementSyntax> target, byte terminalCommand, LoopControlKind controlKind, ExpressionSyntax? condition)
