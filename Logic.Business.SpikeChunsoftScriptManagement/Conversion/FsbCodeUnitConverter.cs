@@ -673,20 +673,12 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         string endLabel = CreateLabel();
         _switchContextStack.Push(new SwitchEmissionContext(endLabel));
 
-        LiteralExpressionSyntax switchVariable;
-        if (switchStatement.Expression is LiteralExpressionSyntax literal)
-        {
-            switchVariable = literal;
-        }
-        else
-        {
-            string tempName = CreateSwitchTempName();
-            switchVariable = CreateStringLiteralExpression(tempName);
-            AddExpressionOperations(operations, switchVariable, jumpLabel);
-            AddExpressionOperations(operations, switchStatement.Expression, null);
-            AddOperation(operations, 0x20);
-            AddOperation(operations, 0x27);
-        }
+        string tempName = CreateSwitchTempName();
+        LiteralExpressionSyntax switchVariable = CreateStringLiteralExpression(tempName);
+        AddExpressionOperations(operations, switchVariable, jumpLabel);
+        AddExpressionOperations(operations, switchStatement.Expression, null);
+        AddOperation(operations, 0x20);
+        AddOperation(operations, 0x27);
 
         var cases = new List<(CaseStatementSyntax Case, string Label)>();
         foreach (CaseStatementSyntax @case in switchStatement.Cases)

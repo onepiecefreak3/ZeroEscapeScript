@@ -785,8 +785,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             IReadOnlyList<StatementSyntax> statements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, out condition);
             result.AddRange(statements);
             if (TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition,
-                    out StatementSyntax? switchStatement, out int nextSwitchIndex))
+                    out StatementSyntax? switchStatement, out int nextSwitchIndex, out int removeLeadingStatements))
             {
+                if (removeLeadingStatements > 0)
+                    result.RemoveRange(result.Count - removeLeadingStatements, removeLeadingStatements);
+
                 result.Add(switchStatement);
                 i = nextSwitchIndex;
                 continue;
@@ -811,10 +814,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private bool TryBuildSwitchStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
         Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, IReadOnlyList<StatementSyntax> leadingStatements,
-        ExpressionSyntax? condition, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
+        ExpressionSyntax? condition, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex, out int removeLeadingStatements)
     {
         statement = null;
         nextIndex = index + 1;
+        removeLeadingStatements = 0;
 
         StatementBlock block = blocks[index];
         if (block.TerminalCommand is not 0x36 || block.JumpLabel is null)
@@ -823,7 +827,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         if (condition is null)
             return false;
 
-        if (!TryGetSwitchAssignment(leadingStatements, out LiteralExpressionSyntax switchVariable))
+        if (!TryGetSwitchAssignment(leadingStatements, out LiteralExpressionSyntax switchVariable, out ExpressionSyntax switchValue))
             return false;
 
         if (!TryGetSwitchCaseLabel(condition, switchVariable, out ExpressionSyntax firstCaseLabel))
@@ -908,15 +912,17 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             cases.Add(CreateCaseStatement(caseLabel, caseStatements));
         }
 
-        switchVariable = CreateStringLiteralExpression(switchVariable.Literal.Text[1..^1]);
-        statement = CreateSwitchStatement(switchVariable, cases);
+        statement = CreateSwitchStatement(switchValue, cases);
         nextIndex = endLabelIndex;
+        removeLeadingStatements = leadingStatements.Count;
         return true;
     }
 
-    private bool TryGetSwitchAssignment(IReadOnlyList<StatementSyntax> statements, out LiteralExpressionSyntax switchVariable)
+    private bool TryGetSwitchAssignment(IReadOnlyList<StatementSyntax> statements, out LiteralExpressionSyntax switchVariable,
+        out ExpressionSyntax switchValue)
     {
         switchVariable = null!;
+        switchValue = null!;
 
         if (statements.Count != 1)
             return false;
@@ -928,6 +934,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             return false;
 
         switchVariable = literal;
+        switchValue = assignment.Assignment.Right;
         return true;
     }
 
