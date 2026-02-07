@@ -510,6 +510,12 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case "else":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ElseKeyword, position, line, column, finalValue);
 
+            case "switch":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.SwitchKeyword, position, line, column, finalValue);
+
+            case "case":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.CaseKeyword, position, line, column, finalValue);
+
             case "do":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.DoKeyword, position, line, column, finalValue);
 

@@ -137,6 +137,10 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
                 NormalizeIfNotElseStatement(ifNotElseStatement, ctx);
                 break;
 
+            case SwitchStatementSyntax switchStatement:
+                NormalizeSwitchStatement(switchStatement, ctx);
+                break;
+
             case DoWhileStatementSyntax doWhileStatement:
                 NormalizeDoWhileStatement(doWhileStatement, ctx);
                 break;
@@ -397,6 +401,72 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
         NormalizeExpression(ifNotElseStatement.Condition, ctx);
+    }
+
+    private void NormalizeSwitchStatement(SwitchStatementSyntax switchStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken switchToken = switchStatement.Switch.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken parenOpen = switchStatement.ParenOpen.WithNoTrivia();
+        SyntaxToken parenClose = switchStatement.ParenClose.WithNoTrivia().WithTrailingTrivia("\r\n");
+        SyntaxToken curlyOpen = switchStatement.CurlyOpen.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia("\r\n");
+        SyntaxToken curlyClose = switchStatement.CurlyClose.WithLeadingTrivia(leadingTrivia);
+
+        if (ctx.ShouldLineBreak)
+            curlyClose = curlyClose.WithTrailingTrivia("\r\n");
+
+        switchStatement.SetSwitch(switchToken, false);
+        switchStatement.SetParenOpen(parenOpen, false);
+        switchStatement.SetParenClose(parenClose, false);
+        switchStatement.SetCurlyOpen(curlyOpen, false);
+        switchStatement.SetCurlyClose(curlyClose, false);
+
+        var caseCtx = ctx;
+        caseCtx.Indent++;
+        foreach (CaseStatementSyntax @case in switchStatement.Cases)
+        {
+            caseCtx.IsFirstElement = switchStatement.Cases[0] == @case;
+            caseCtx.ShouldLineBreak = true;
+            caseCtx.ShouldIndent = true;
+            NormalizeCaseStatement(@case, caseCtx);
+        }
+
+        ctx.IsFirstElement = true;
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        NormalizeExpression(switchStatement.Expression, ctx);
+    }
+
+    private void NormalizeCaseStatement(CaseStatementSyntax caseStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken caseToken = caseStatement.Case.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken colon = caseStatement.Colon.WithNoTrivia().WithTrailingTrivia("\r\n");
+
+        caseStatement.SetCase(caseToken, false);
+        caseStatement.SetColon(colon, false);
+
+        var labelCtx = ctx;
+        labelCtx.IsFirstElement = true;
+        labelCtx.ShouldIndent = false;
+        labelCtx.ShouldLineBreak = false;
+        NormalizeExpression(caseStatement.Label, labelCtx);
+
+        var bodyCtx = ctx;
+        bodyCtx.Indent++;
+        foreach (StatementSyntax statement in caseStatement.Statements)
+        {
+            bodyCtx.IsFirstElement = caseStatement.Statements[0] == statement;
+            bodyCtx.ShouldLineBreak = true;
+            bodyCtx.ShouldIndent = true;
+            NormalizeStatement(statement, bodyCtx);
+        }
     }
 
     private void NormalizeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, WhitespaceNormalizeContext ctx)

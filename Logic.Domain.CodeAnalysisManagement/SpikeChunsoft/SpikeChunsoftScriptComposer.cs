@@ -104,6 +104,10 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
                 ComposeIfNotElseStatement(ifNotElseStatement, sb);
                 break;
 
+            case SwitchStatementSyntax switchStatement:
+                ComposeSwitchStatement(switchStatement, sb);
+                break;
+
             case DoWhileStatementSyntax doWhileStatement:
                 ComposeDoWhileStatement(doWhileStatement, sb);
                 break;
@@ -230,6 +234,27 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeBlock(ifNotElseStatement.Body, sb);
         ComposeSyntaxToken(ifNotElseStatement.Else, sb);
         ComposeBlock(ifNotElseStatement.ElseBody, sb);
+    }
+
+    private void ComposeSwitchStatement(SwitchStatementSyntax switchStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(switchStatement.Switch, sb);
+        ComposeSyntaxToken(switchStatement.ParenOpen, sb);
+        ComposeExpression(switchStatement.Expression, sb);
+        ComposeSyntaxToken(switchStatement.ParenClose, sb);
+        ComposeSyntaxToken(switchStatement.CurlyOpen, sb);
+        foreach (CaseStatementSyntax @case in switchStatement.Cases)
+            ComposeCaseStatement(@case, sb);
+        ComposeSyntaxToken(switchStatement.CurlyClose, sb);
+    }
+
+    private void ComposeCaseStatement(CaseStatementSyntax caseStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(caseStatement.Case, sb);
+        ComposeExpression(caseStatement.Label, sb);
+        ComposeSyntaxToken(caseStatement.Colon, sb);
+        foreach (StatementSyntax statement in caseStatement.Statements)
+            ComposeStatement(statement, sb);
     }
 
     private void ComposeDoWhileStatement(DoWhileStatementSyntax doWhileStatement, StringBuilder sb)

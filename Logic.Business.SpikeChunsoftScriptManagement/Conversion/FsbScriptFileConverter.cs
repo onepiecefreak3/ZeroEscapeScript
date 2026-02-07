@@ -4,6 +4,7 @@ using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
+using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
@@ -512,7 +513,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private NativeMethodInvocationExpressionSyntax CreateNativeMethodInvocationExpression(Stack<ExpressionSyntax> syntax, Stack<ExpressionSyntax> args)
     {
         ExpressionSyntax nameExpression = syntax.Pop();
-        
+
         if (nameExpression is not MemberAccessExpressionSyntax && (nameExpression is not LiteralExpressionSyntax literal || literal.Literal.RawKind != (int)SyntaxTokenKind.StringLiteral))
             throw new InvalidOperationException("Need method name for invocation.");
 
@@ -781,7 +782,16 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
             skipLoopStart = false;
 
-            result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, out condition));
+            IReadOnlyList<StatementSyntax> statements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, out condition);
+            result.AddRange(statements);
+            if (TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition,
+                    out StatementSyntax? switchStatement, out int nextSwitchIndex))
+            {
+                result.Add(switchStatement);
+                i = nextSwitchIndex;
+                continue;
+            }
+
             if (TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition, out StatementSyntax? ifStatement,
                     out int nextIndex))
             {
@@ -797,6 +807,157 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         }
 
         return result;
+    }
+
+    private bool TryBuildSwitchStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
+        Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, IReadOnlyList<StatementSyntax> leadingStatements,
+        ExpressionSyntax? condition, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
+    {
+        statement = null;
+        nextIndex = index + 1;
+
+        StatementBlock block = blocks[index];
+        if (block.TerminalCommand is not 0x36 || block.JumpLabel is null)
+            return false;
+
+        if (condition is null)
+            return false;
+
+        if (!TryGetSwitchAssignment(leadingStatements, out LiteralExpressionSyntax switchVariable))
+            return false;
+
+        if (!TryGetSwitchCaseLabel(condition, switchVariable, out ExpressionSyntax firstCaseLabel))
+            return false;
+
+        if (!labelLookup.TryGetValue(block.JumpLabel, out int firstCaseTarget))
+            return false;
+
+        var caseMatches = new List<(ExpressionSyntax Label, int TargetIndex)>
+        {
+            (firstCaseLabel, firstCaseTarget)
+        };
+
+        int currentIndex = index + 1;
+        for (; currentIndex < endIndex; currentIndex++)
+        {
+            StatementBlock nextBlock = blocks[currentIndex];
+            if (nextBlock.TerminalCommand is not 0x36 || nextBlock.JumpLabel is null)
+                break;
+
+            IReadOnlyList<StatementSyntax> blockStatements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, currentIndex, true,
+                out ExpressionSyntax? blockCondition);
+            if (blockStatements.Count > 0)
+                return false;
+
+            if (blockCondition is null)
+                return false;
+
+            if (!TryGetSwitchCaseLabel(blockCondition, switchVariable, out ExpressionSyntax caseLabel))
+                return false;
+
+            if (!labelLookup.TryGetValue(nextBlock.JumpLabel, out int targetIndex))
+                return false;
+
+            caseMatches.Add((caseLabel, targetIndex));
+        }
+
+        if (caseMatches.Count <= 0)
+            return false;
+
+        if (caseMatches.Select(match => match.TargetIndex).Distinct().Count() != caseMatches.Count)
+            return false;
+
+        if (currentIndex >= endIndex)
+            return false;
+
+        StatementBlock endJumpBlock = blocks[currentIndex];
+        if (endJumpBlock.TerminalCommand is not 0x35 || endJumpBlock.JumpLabel is null)
+            return false;
+
+        if (!labelLookup.TryGetValue(endJumpBlock.JumpLabel, out int endLabelIndex))
+            return false;
+
+        if (endLabelIndex <= currentIndex || endLabelIndex > endIndex)
+            return false;
+
+        var caseStartIndices = caseMatches.Select(match => match.TargetIndex).Distinct().OrderBy(target => target).ToList();
+        if (caseStartIndices.Count <= 0)
+            return false;
+
+        if (caseStartIndices[0] <= currentIndex || caseStartIndices[^1] >= endLabelIndex)
+            return false;
+
+        var caseBodies = new Dictionary<int, IReadOnlyList<StatementSyntax>>();
+        for (var caseIndex = 0; caseIndex < caseStartIndices.Count; caseIndex++)
+        {
+            int caseStart = caseStartIndices[caseIndex];
+            int caseEnd = caseIndex + 1 < caseStartIndices.Count ? caseStartIndices[caseIndex + 1] : endLabelIndex;
+            IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, caseStart, caseEnd, out _,
+                false, loopContext);
+            caseBodies[caseStart] = bodyStatements;
+        }
+
+        var cases = new List<CaseStatementSyntax>();
+        foreach ((ExpressionSyntax caseLabel, int targetIndex) in caseMatches)
+        {
+            IReadOnlyList<StatementSyntax> bodyStatements = caseBodies[targetIndex];
+            var caseStatements = new List<StatementSyntax>(bodyStatements);
+            if (caseStatements.Count <= 0 || caseStatements[^1] is not BreakStatementSyntax)
+                caseStatements.Add(CreateBreakStatement());
+
+            cases.Add(CreateCaseStatement(caseLabel, caseStatements));
+        }
+
+        switchVariable = CreateStringLiteralExpression(switchVariable.Literal.Text[1..^1]);
+        statement = CreateSwitchStatement(switchVariable, cases);
+        nextIndex = endLabelIndex;
+        return true;
+    }
+
+    private bool TryGetSwitchAssignment(IReadOnlyList<StatementSyntax> statements, out LiteralExpressionSyntax switchVariable)
+    {
+        switchVariable = null!;
+
+        if (statements.Count != 1)
+            return false;
+
+        if (statements[0] is not AssignmentStatementSyntax assignment)
+            return false;
+
+        if (assignment.Assignment.Left is not LiteralExpressionSyntax literal)
+            return false;
+
+        switchVariable = literal;
+        return true;
+    }
+
+    private static bool TryGetSwitchCaseLabel(ExpressionSyntax condition, LiteralExpressionSyntax switchVariable, out ExpressionSyntax caseLabel)
+    {
+        caseLabel = null!;
+
+        if (condition is not BinaryExpressionSyntax binary ||
+            binary.Operation.RawKind != (int)SyntaxTokenKind.EqualsEquals)
+            return false;
+
+        if (IsMatchingSwitchVariable(binary.Left, switchVariable))
+        {
+            caseLabel = binary.Right;
+            return true;
+        }
+
+        if (IsMatchingSwitchVariable(binary.Right, switchVariable))
+        {
+            caseLabel = binary.Left;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsMatchingSwitchVariable(ExpressionSyntax expression, LiteralExpressionSyntax switchVariable)
+    {
+        return expression is LiteralExpressionSyntax literal &&
+               literal.Literal.Text.Equals(switchVariable.Literal.Text, StringComparison.Ordinal);
     }
 
     private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
@@ -1011,6 +1172,25 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         BlockExpression elseBody = CreateElseBlockExpression(elseStatements);
 
         return new IfNotElseStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
+    }
+
+    private SwitchStatementSyntax CreateSwitchStatement(ExpressionSyntax expression, IReadOnlyList<CaseStatementSyntax> cases)
+    {
+        SyntaxToken switchToken = syntaxFactory.Token(SyntaxTokenKind.SwitchKeyword);
+        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+
+        return new SwitchStatementSyntax(switchToken, parenOpen, expression, parenClose, curlyOpen, cases, curlyClose);
+    }
+
+    private CaseStatementSyntax CreateCaseStatement(ExpressionSyntax label, IReadOnlyList<StatementSyntax> statements)
+    {
+        SyntaxToken caseToken = syntaxFactory.Token(SyntaxTokenKind.CaseKeyword);
+        SyntaxToken colon = syntaxFactory.Token(SyntaxTokenKind.Colon);
+
+        return new CaseStatementSyntax(caseToken, label, colon, statements);
     }
 
     private DoWhileStatementSyntax CreateDoWhileStatement(IReadOnlyList<StatementSyntax> bodyStatements, ExpressionSyntax condition)

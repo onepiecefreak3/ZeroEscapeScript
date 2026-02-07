@@ -59,6 +59,8 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
             case SyntaxTokenKind.NotKeyword: return new("not", (int)kind);
             case SyntaxTokenKind.IfKeyword: return new("if", (int)kind);
             case SyntaxTokenKind.ElseKeyword: return new("else", (int)kind);
+            case SyntaxTokenKind.SwitchKeyword: return new("switch", (int)kind);
+            case SyntaxTokenKind.CaseKeyword: return new("case", (int)kind);
             case SyntaxTokenKind.DoKeyword: return new("do", (int)kind);
             case SyntaxTokenKind.WhileKeyword: return new("while", (int)kind);
             case SyntaxTokenKind.AsyncKeyword: return new("async", (int)kind);

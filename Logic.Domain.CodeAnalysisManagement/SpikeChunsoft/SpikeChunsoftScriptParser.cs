@@ -130,6 +130,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.SwitchKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.IfKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.DoKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.BreakKeyword) ||
@@ -173,6 +174,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         if (HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword))
             return ParseAsyncBlockStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.SwitchKeyword))
+            return ParseSwitchStatement(buffer);
 
         if (HasTokenKind(buffer, SyntaxTokenKind.IfKeyword))
             return ParseIfStatement(buffer);
@@ -305,6 +309,49 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
             return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
 
         return new IfNotElseStatementSyntax(ifToken, notToken.Value, parenOpen, condition, parenClose, body, elseToken, elseBody);
+    }
+
+    private SwitchStatementSyntax ParseSwitchStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken switchToken = ParseSwitchKeywordToken(buffer);
+        SyntaxToken parenOpen = ParseParenOpenToken(buffer);
+        ExpressionSyntax expression = ParseExpression(buffer);
+        SyntaxToken parenClose = ParseParenCloseToken(buffer);
+        SyntaxToken curlyOpen = ParseCurlyOpenToken(buffer);
+        IReadOnlyList<CaseStatementSyntax> cases = ParseCaseStatements(buffer);
+        SyntaxToken curlyClose = ParseCurlyCloseToken(buffer);
+
+        return new SwitchStatementSyntax(switchToken, parenOpen, expression, parenClose, curlyOpen, cases, curlyClose);
+    }
+
+    private IReadOnlyList<CaseStatementSyntax> ParseCaseStatements(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var result = new List<CaseStatementSyntax>();
+
+        while (HasTokenKind(buffer, SyntaxTokenKind.CaseKeyword))
+            result.Add(ParseCaseStatement(buffer));
+
+        return result;
+    }
+
+    private CaseStatementSyntax ParseCaseStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken caseToken = ParseCaseKeywordToken(buffer);
+        ExpressionSyntax label = ParseExpression(buffer);
+        SyntaxToken colon = ParseColonToken(buffer);
+        IReadOnlyList<StatementSyntax> statements = ParseCaseStatementsBody(buffer);
+
+        return new CaseStatementSyntax(caseToken, label, colon, statements);
+    }
+
+    private IReadOnlyList<StatementSyntax> ParseCaseStatementsBody(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var result = new List<StatementSyntax>();
+
+        while (IsStatement(buffer))
+            result.Add(ParseStatement(buffer));
+
+        return result;
     }
 
     private BlockExpression CreateInlineBlockExpression(StatementSyntax statement)
@@ -1014,6 +1061,16 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseIfKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.IfKeyword);
+    }
+
+    private SyntaxToken ParseSwitchKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.SwitchKeyword);
+    }
+
+    private SyntaxToken ParseCaseKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.CaseKeyword);
     }
 
     private SyntaxToken ParseNotKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

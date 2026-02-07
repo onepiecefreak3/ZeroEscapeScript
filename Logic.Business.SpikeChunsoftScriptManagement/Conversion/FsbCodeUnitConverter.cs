@@ -12,7 +12,9 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 {
     private readonly Regex _subPattern = new("^sub[0-9]+$", RegexOptions.Compiled);
     private int _labelCounter;
+    private int _switchTempCounter;
     private readonly Stack<LoopEmissionContext> _loopContextStack = new();
+    private readonly Stack<SwitchEmissionContext> _switchContextStack = new();
 
     public Sir0Function[] CreateScriptFile(CodeUnitSyntax tree)
     {
@@ -69,8 +71,13 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
     private string? CreateOperationsInternal(List<Sir0Operation> operations, BlockExpression block, string? leadingLabel)
     {
+        return CreateOperationsInternal(operations, block.Statements, leadingLabel);
+    }
+
+    private string? CreateOperationsInternal(List<Sir0Operation> operations, IReadOnlyList<StatementSyntax> statements, string? leadingLabel)
+    {
         string? jumpLabel = leadingLabel;
-        foreach (StatementSyntax statement in block.Statements)
+        foreach (StatementSyntax statement in statements)
         {
             string? nextLabel = null;
             switch (statement)
@@ -116,6 +123,10 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
                 case IfNotElseStatementSyntax ifNotElseStatement:
                     nextLabel = AddIfNotElseOperations(operations, ifNotElseStatement, jumpLabel);
+                    break;
+
+                case SwitchStatementSyntax switchStatement:
+                    nextLabel = AddSwitchOperations(operations, switchStatement, jumpLabel);
                     break;
 
                 case DoWhileStatementSyntax doWhileStatement:
@@ -501,11 +512,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
         string? danglingLabel = CreateOperationsInternal(operations, ifStatement.Body, null);
 
-        if (IsInlineBlock(ifStatement.Parent))
-        {
-            AddGotoOperation(operations, danglingLabel, endLabel);
-        }
-        else if (danglingLabel is not null)
+        if (danglingLabel is not null)
         {
             UpdateJumpTarget(operations, conditionIndex, danglingLabel);
             endLabel = danglingLabel;
@@ -594,11 +601,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
         string? danglingLabel = CreateOperationsInternal(operations, ifNotStatement.Body, null);
 
-        if (IsInlineBlock(ifNotStatement.Parent))
-        {
-            AddGotoOperation(operations, danglingLabel, endLabel);
-        }
-        else if (danglingLabel is not null)
+        if (danglingLabel is not null)
         {
             UpdateJumpTarget(operations, conditionIndex, danglingLabel);
             endLabel = danglingLabel;
@@ -665,13 +668,62 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private static bool IsInlineBlock(SyntaxNode? node)
+    private string AddSwitchOperations(List<Sir0Operation> operations, SwitchStatementSyntax switchStatement, string? jumpLabel)
     {
-        if (node is not BlockExpression blockExpression)
-            return false;
+        string endLabel = CreateLabel();
+        _switchContextStack.Push(new SwitchEmissionContext(endLabel));
 
-        return string.IsNullOrEmpty(blockExpression.CurlyOpen.Text) &&
-               string.IsNullOrEmpty(blockExpression.CurlyClose.Text);
+        LiteralExpressionSyntax switchVariable;
+        if (switchStatement.Expression is LiteralExpressionSyntax literal)
+        {
+            switchVariable = literal;
+        }
+        else
+        {
+            string tempName = CreateSwitchTempName();
+            switchVariable = CreateStringLiteralExpression(tempName);
+            AddExpressionOperations(operations, switchVariable, jumpLabel);
+            AddExpressionOperations(operations, switchStatement.Expression, null);
+            AddOperation(operations, 0x20);
+            AddOperation(operations, 0x27);
+        }
+
+        var cases = new List<(CaseStatementSyntax Case, string Label)>();
+        foreach (CaseStatementSyntax @case in switchStatement.Cases)
+            cases.Add((@case, CreateLabel()));
+
+        foreach ((CaseStatementSyntax @case, string label) in cases)
+        {
+            AddExpressionOperations(operations, switchVariable, null);
+            AddExpressionOperations(operations, @case.Label, null);
+            AddOperation(operations, 0x1A);
+            AddConditionalJumpOnTrue(operations, null, label);
+        }
+
+        AddGotoOperation(operations, null, endLabel);
+
+        foreach ((CaseStatementSyntax @case, string label) in cases)
+        {
+            bool endsWithBreak = @case.Statements.Count > 0 && @case.Statements[^1] is BreakStatementSyntax;
+            string? danglingLabel = CreateOperationsInternal(operations, @case.Statements, label);
+            if (!endsWithBreak)
+                AddGotoOperation(operations, danglingLabel, endLabel);
+        }
+
+        _switchContextStack.Pop();
+
+        return endLabel;
+    }
+
+    private LiteralExpressionSyntax CreateStringLiteralExpression(string value)
+    {
+        SyntaxToken literal = syntaxFactory.StringLiteral(value);
+        return new LiteralExpressionSyntax(literal);
+    }
+
+    private string CreateSwitchTempName()
+    {
+        return $"?t_{_switchTempCounter++}_";
     }
 
     private bool TryGetLoopControlTarget(BlockExpression body, out string targetLabel, out bool isBreak)
@@ -745,6 +797,12 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
     private string? AddBreakOperation(List<Sir0Operation> operations, string? jumpLabel)
     {
+        if (_switchContextStack.Count > 0)
+        {
+            AddGotoOperation(operations, jumpLabel, _switchContextStack.Peek().EndLabel);
+            return null;
+        }
+
         if (_loopContextStack.Count == 0)
             throw new InvalidOperationException("Break statement is only valid within a loop.");
 
@@ -933,6 +991,16 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         {
             StartLabel = startLabel;
             BreakLabel = breakLabel;
+        }
+    }
+
+    private sealed class SwitchEmissionContext
+    {
+        public string EndLabel { get; }
+
+        public SwitchEmissionContext(string endLabel)
+        {
+            EndLabel = endLabel;
         }
     }
 

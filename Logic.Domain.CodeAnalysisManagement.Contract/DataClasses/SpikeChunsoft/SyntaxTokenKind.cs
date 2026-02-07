@@ -53,6 +53,8 @@ public enum SyntaxTokenKind
     NotKeyword,
     IfKeyword,
     ElseKeyword,
+    SwitchKeyword,
+    CaseKeyword,
     DoKeyword,
     WhileKeyword,
     AsyncKeyword,
