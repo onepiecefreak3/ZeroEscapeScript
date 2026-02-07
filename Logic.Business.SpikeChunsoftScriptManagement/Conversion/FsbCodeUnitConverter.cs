@@ -479,8 +479,19 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         }
     }
 
-    private string AddIfOperations(List<Sir0Operation> operations, IfStatementSyntax ifStatement, string? jumpLabel)
+    private string? AddIfOperations(List<Sir0Operation> operations, IfStatementSyntax ifStatement, string? jumpLabel)
     {
+        if (TryGetLoopControlTarget(ifStatement.Body, out string loopTargetLabel, out bool isBreak))
+        {
+            AddExpressionOperations(operations, ifStatement.Condition, jumpLabel);
+            AddConditionalJumpOnTrue(operations, null, loopTargetLabel);
+
+            if (isBreak)
+                _loopContextStack.Peek().BreakUsed = true;
+
+            return null;
+        }
+
         string endLabel = CreateLabel();
 
         AddExpressionOperations(operations, ifStatement.Condition, jumpLabel);
@@ -503,8 +514,43 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfElseOperations(List<Sir0Operation> operations, IfElseStatementSyntax ifElseStatement, string? jumpLabel)
+    private string? AddIfElseOperations(List<Sir0Operation> operations, IfElseStatementSyntax ifElseStatement, string? jumpLabel)
     {
+        bool hasThenControl = TryGetLoopControlTarget(ifElseStatement.Body, out string thenTargetLabel, out bool thenBreak);
+        bool hasElseControl = TryGetLoopControlTarget(ifElseStatement.ElseBody, out string elseTargetLabel, out bool elseBreak);
+        if (hasThenControl || hasElseControl)
+        {
+            AddExpressionOperations(operations, ifElseStatement.Condition, jumpLabel);
+
+            if (hasThenControl && hasElseControl)
+            {
+                AddConditionalJumpOnTrue(operations, null, thenTargetLabel);
+                AddGotoOperation(operations, null, elseTargetLabel);
+
+                if (thenBreak || elseBreak)
+                    _loopContextStack.Peek().BreakUsed = true;
+
+                return null;
+            }
+
+            if (hasThenControl)
+            {
+                AddConditionalJumpOnTrue(operations, null, thenTargetLabel);
+
+                if (thenBreak)
+                    _loopContextStack.Peek().BreakUsed = true;
+
+                return CreateOperationsInternal(operations, ifElseStatement.ElseBody, null);
+            }
+
+            AddConditionalJumpOnFalse(operations, null, elseTargetLabel);
+
+            if (elseBreak)
+                _loopContextStack.Peek().BreakUsed = true;
+
+            return CreateOperationsInternal(operations, ifElseStatement.Body, null);
+        }
+
         string elseLabel = CreateLabel();
         string endLabel = CreateLabel();
 
@@ -526,8 +572,19 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfNotOperations(List<Sir0Operation> operations, IfNotStatementSyntax ifNotStatement, string? jumpLabel)
+    private string? AddIfNotOperations(List<Sir0Operation> operations, IfNotStatementSyntax ifNotStatement, string? jumpLabel)
     {
+        if (TryGetLoopControlTarget(ifNotStatement.Body, out string loopTargetLabel, out bool isBreak))
+        {
+            AddExpressionOperations(operations, ifNotStatement.Condition, jumpLabel);
+            AddConditionalJumpOnFalse(operations, null, loopTargetLabel);
+
+            if (isBreak)
+                _loopContextStack.Peek().BreakUsed = true;
+
+            return null;
+        }
+
         string endLabel = CreateLabel();
 
         AddExpressionOperations(operations, ifNotStatement.Condition, jumpLabel);
@@ -550,8 +607,43 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         return endLabel;
     }
 
-    private string AddIfNotElseOperations(List<Sir0Operation> operations, IfNotElseStatementSyntax ifNotElseStatement, string? jumpLabel)
+    private string? AddIfNotElseOperations(List<Sir0Operation> operations, IfNotElseStatementSyntax ifNotElseStatement, string? jumpLabel)
     {
+        bool hasThenControl = TryGetLoopControlTarget(ifNotElseStatement.Body, out string thenTargetLabel, out bool thenBreak);
+        bool hasElseControl = TryGetLoopControlTarget(ifNotElseStatement.ElseBody, out string elseTargetLabel, out bool elseBreak);
+        if (hasThenControl || hasElseControl)
+        {
+            AddExpressionOperations(operations, ifNotElseStatement.Condition, jumpLabel);
+
+            if (hasThenControl && hasElseControl)
+            {
+                AddConditionalJumpOnFalse(operations, null, thenTargetLabel);
+                AddGotoOperation(operations, null, elseTargetLabel);
+
+                if (thenBreak || elseBreak)
+                    _loopContextStack.Peek().BreakUsed = true;
+
+                return null;
+            }
+
+            if (hasThenControl)
+            {
+                AddConditionalJumpOnFalse(operations, null, thenTargetLabel);
+
+                if (thenBreak)
+                    _loopContextStack.Peek().BreakUsed = true;
+
+                return CreateOperationsInternal(operations, ifNotElseStatement.ElseBody, null);
+            }
+
+            AddConditionalJumpOnTrue(operations, null, elseTargetLabel);
+
+            if (elseBreak)
+                _loopContextStack.Peek().BreakUsed = true;
+
+            return CreateOperationsInternal(operations, ifNotElseStatement.Body, null);
+        }
+
         string elseLabel = CreateLabel();
         string endLabel = CreateLabel();
 
@@ -580,6 +672,34 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
         return string.IsNullOrEmpty(blockExpression.CurlyOpen.Text) &&
                string.IsNullOrEmpty(blockExpression.CurlyClose.Text);
+    }
+
+    private bool TryGetLoopControlTarget(BlockExpression body, out string targetLabel, out bool isBreak)
+    {
+        targetLabel = string.Empty;
+        isBreak = false;
+
+        if (_loopContextStack.Count == 0)
+            return false;
+
+        if (body.Statements.Count != 1)
+            return false;
+
+        LoopEmissionContext loopContext = _loopContextStack.Peek();
+        switch (body.Statements[0])
+        {
+            case BreakStatementSyntax:
+                targetLabel = loopContext.BreakLabel;
+                isBreak = true;
+                return true;
+
+            case ContinueStatementSyntax:
+                targetLabel = loopContext.StartLabel;
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     private string? AddDoWhileOperations(List<Sir0Operation> operations, DoWhileStatementSyntax doWhileStatement, string? jumpLabel)
