@@ -256,7 +256,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.IsFirstElement = true;
         ctx.ShouldIndent = false;
         ctx.ShouldLineBreak = false;
-        NormalizeLiteralExpression(returnStatement.Expression, ctx);
+        NormalizeExpression(returnStatement.Expression, ctx);
     }
 
     private void NormalizeAsyncBlockStatement(AsyncBlockStatement asyncBlock, WhitespaceNormalizeContext ctx)
@@ -780,7 +780,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeAssignmentExpression(AssignmentExpressionSyntax assignmentExpression, WhitespaceNormalizeContext ctx)
     {
-        SyntaxToken newOperator = assignmentExpression.Operation.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
+        SyntaxToken newOperator = assignmentExpression.Operator.WithLeadingTrivia(" ").WithTrailingTrivia(" ");
 
         ctx.ShouldIndent = true;
         ctx.ShouldLineBreak = false;

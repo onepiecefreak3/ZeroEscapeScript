@@ -253,9 +253,14 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private ReturnStatementSyntax ParseReturnStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         SyntaxToken returnToken = ParseReturnKeywordToken(buffer);
+
+        ExpressionSyntax? returnValue = null;
+        if (!HasTokenKind(buffer, SyntaxTokenKind.Semicolon))
+            returnValue = ParseExpression(buffer);
+
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
-        return new ReturnStatementSyntax(returnToken, null, semicolon);
+        return new ReturnStatementSyntax(returnToken, returnValue, semicolon);
     }
 
     private GotoLabelStatementSyntax ParseGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)

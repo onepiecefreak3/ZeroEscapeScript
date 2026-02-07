@@ -3,13 +3,13 @@
 public class ReturnStatementSyntax : StatementSyntax
 {
     public SyntaxToken Return { get; private set; }
-    public LiteralExpressionSyntax? Expression { get; private set; }
+    public ExpressionSyntax? Expression { get; private set; }
     public SyntaxToken Semicolon { get; private set; }
 
     public override SyntaxLocation Location => Return.FullLocation;
     public override SyntaxSpan Span => new(Return.FullSpan.Position, Semicolon.FullSpan.EndPosition);
 
-    public ReturnStatementSyntax(SyntaxToken returnToken, LiteralExpressionSyntax? expression, SyntaxToken semicolon)
+    public ReturnStatementSyntax(SyntaxToken returnToken, ExpressionSyntax? expression, SyntaxToken semicolon)
     {
         returnToken.Parent = this;
         if (expression != null)
@@ -32,7 +32,7 @@ public class ReturnStatementSyntax : StatementSyntax
             Root.Update();
     }
 
-    public void SetValue(LiteralExpressionSyntax? valueExpression, bool updatePositions = true)
+    public void SetValue(ExpressionSyntax? valueExpression, bool updatePositions = true)
     {
         if (valueExpression != null)
             valueExpression.Parent = this;

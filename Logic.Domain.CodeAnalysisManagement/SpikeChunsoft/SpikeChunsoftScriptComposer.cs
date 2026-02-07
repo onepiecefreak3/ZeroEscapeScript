@@ -296,7 +296,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         ComposeSyntaxToken(returnStatement.Return, sb);
         if (returnStatement.Expression != null)
-            ComposeLiteralExpression(returnStatement.Expression, sb);
+            ComposeExpression(returnStatement.Expression, sb);
         ComposeSyntaxToken(returnStatement.Semicolon, sb);
     }
 
@@ -421,7 +421,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     private void ComposeAssignmentExpression(AssignmentExpressionSyntax assignment, StringBuilder sb)
     {
         ComposeExpression(assignment.Left, sb);
-        ComposeSyntaxToken(assignment.Operation, sb);
+        ComposeSyntaxToken(assignment.Operator, sb);
         ComposeExpression(assignment.Right, sb);
     }
 

@@ -145,8 +145,8 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                     nextLabel = AddContinueOperation(operations, jumpLabel);
                     break;
 
-                case ReturnStatementSyntax:
-                    AddOperation(operations, 0x30, jumpLabel);
+                case ReturnStatementSyntax returnStatement:
+                    AddReturnOperations(operations, returnStatement, jumpLabel);
                     break;
 
                 case ExitStatementSyntax:
@@ -435,7 +435,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         AddExpressionOperations(operations, expression.Left, jumpLabel);
         AddExpressionOperations(operations, expression.Right, null);
 
-        switch (expression.Operation.RawKind)
+        switch (expression.Operator.RawKind)
         {
             case (int)SyntaxTokenKind.Equals:
                 AddOperation(operations, 0x20);
@@ -450,7 +450,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                 break;
 
             default:
-                throw new InvalidOperationException($"Unknown assignment expression {expression.Operation.RawKind}.");
+                throw new InvalidOperationException($"Unknown assignment expression {expression.Operator.RawKind}.");
         }
     }
 
@@ -814,6 +814,21 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         AddGotoOperation(operations, jumpLabel, loopContext.StartLabel);
 
         return null;
+    }
+
+    private void AddReturnOperations(List<Sir0Operation> operations, ReturnStatementSyntax returnStatement, string? jumpLabel)
+    {
+        if (returnStatement.Expression is not null)
+        {
+            AddStringLiteralOperation(operations, "?4", jumpLabel);
+            AddExpressionOperations(operations, returnStatement.Expression, null);
+            AddOperation(operations, 0x20);
+            AddOperation(operations, 0x27);
+
+            jumpLabel = null;
+        }
+
+        AddOperation(operations, 0x30, jumpLabel);
     }
 
     private static void AddNumericLiteralOperation(List<Sir0Operation> operations, float number, string? jumpLabel)

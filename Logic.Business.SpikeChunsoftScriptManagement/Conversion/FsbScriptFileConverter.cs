@@ -565,12 +565,12 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new GotoStatementSyntax(gotoToken, label, semicolon);
     }
 
-    private ReturnStatementSyntax CreateReturnStatement()
+    private ReturnStatementSyntax CreateReturnStatement(ExpressionSyntax? expression = null)
     {
         SyntaxToken returnToken = _syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
         SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
-        return new ReturnStatementSyntax(returnToken, null, semicolon);
+        return new ReturnStatementSyntax(returnToken, expression, semicolon);
     }
 
     private AsyncBlockStatement CreateAsyncBlockStatement(Sir0Operation[] operations, ref int index)
@@ -877,7 +877,49 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         if (expressionStack.Count > 0)
             condition = expressionStack.Pop();
 
+        ApplyReturnAssignmentRewrite(result);
+
         return result;
+    }
+
+    private void ApplyReturnAssignmentRewrite(List<StatementSyntax> statements)
+    {
+        for (int i = 0; i < statements.Count - 1; i++)
+        {
+            if (statements[i] is not AssignmentStatementSyntax assignment)
+                continue;
+
+            if (statements[i + 1] is not ReturnStatementSyntax returnStatement || returnStatement.Expression != null)
+                continue;
+
+            if (!TryGetReturnAssignmentValue(assignment, out ExpressionSyntax? returnValue))
+                continue;
+
+            statements[i] = CreateReturnStatement(returnValue);
+            statements.RemoveAt(i + 1);
+        }
+    }
+
+    private static bool TryGetReturnAssignmentValue(AssignmentStatementSyntax assignment, out ExpressionSyntax? returnValue)
+    {
+        returnValue = null;
+
+        if (assignment.Assignment.Operator.RawKind != (int)SyntaxTokenKind.Equals)
+            return false;
+
+        if (assignment.Assignment.Left is not LiteralExpressionSyntax targetLiteral)
+            return false;
+
+        if (!IsReturnTargetLiteral(targetLiteral))
+            return false;
+
+        returnValue = assignment.Assignment.Right;
+        return true;
+    }
+
+    private static bool IsReturnTargetLiteral(LiteralExpressionSyntax literal)
+    {
+        return literal.Literal.Text.Equals("\"?4\"", StringComparison.Ordinal);
     }
 
 }
