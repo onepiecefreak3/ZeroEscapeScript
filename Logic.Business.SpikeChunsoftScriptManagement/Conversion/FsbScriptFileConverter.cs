@@ -1,16 +1,20 @@
 using Logic.Business.SpikeChunsoftScriptManagement.DataClasses.Conversion;
+using Logic.Business.SpikeChunsoftScriptManagement.Enums.Conversion;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses;
 using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 using Logic.Domain.CodeAnalysisManagement.Contract.SpikeChunsoft;
 using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
-using System;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
 
-internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory, IBlockBuilder blockBuilder) : IFsbScriptFileConverter
+internal class FsbScriptFileConverter : IFsbScriptFileConverter
 {
+    private readonly HighLevelSyntaxFactory _highLevelFactory;
+    private readonly HighLevelSyntaxPatternDetector _highLevelDetector;
+    private readonly ISpikeChunsoftSyntaxFactory _syntaxFactory;
+    private readonly IBlockBuilder _blockBuilder;
+
     private readonly Dictionary<int, int> _operatorPrecedence = new()
     {
         [0x17] = 0,
@@ -55,6 +59,14 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         [SyntaxTokenKind.OrKeyword] = 9
     };
 
+    public FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory, IBlockBuilder blockBuilder)
+    {
+        _syntaxFactory = syntaxFactory;
+        _blockBuilder = blockBuilder;
+        _highLevelFactory = new HighLevelSyntaxFactory(syntaxFactory);
+        _highLevelDetector = new HighLevelSyntaxPatternDetector(_highLevelFactory, BuildStatementsRange, CreateStatementsFromBlock);
+    }
+
     public CodeUnitSyntax CreateCodeUnit(Sir0Function[] functions)
     {
         IReadOnlyList<MethodDeclarationSyntax> methods = CreateMethodDeclarations(functions);
@@ -83,17 +95,17 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private MethodDeclarationParametersSyntax CreateMethodDeclarationParameters()
     {
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new MethodDeclarationParametersSyntax(parenOpen, null, parenClose);
     }
 
     private BlockExpression CreateMethodDeclarationBody(Sir0Function function)
     {
-        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         var expressions = CreateStatements(function);
-        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+        SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
@@ -105,7 +117,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
     {
-        IReadOnlyList<StatementBlock> blocks = blockBuilder.Build(operations);
+        IReadOnlyList<StatementBlock> blocks = _blockBuilder.Build(operations);
         return CreateStatements(blocks);
     }
 
@@ -265,67 +277,67 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         switch (command)
         {
             case 0x0E:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Ampersand);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Ampersand);
                 break;
 
             case 0x10:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Caret);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Caret);
                 break;
 
             case 0x11:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Pipe);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Pipe);
                 break;
 
             case 0x13:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.ShiftRight);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ShiftRight);
                 break;
 
             case 0x14:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.ShiftLeft);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ShiftLeft);
                 break;
 
             case 0x15:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Plus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Plus);
                 break;
 
             case 0x16:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Minus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Minus);
                 break;
 
             case 0x17:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Asterisk);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Asterisk);
                 break;
 
             case 0x18:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Slash);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Slash);
                 break;
 
             case 0x19:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Percent);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Percent);
                 break;
 
             case 0x1A:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.EqualsEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.EqualsEquals);
                 break;
 
             case 0x1B:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.NotEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.NotEquals);
                 break;
 
             case 0x1C:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.SmallerEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.SmallerEquals);
                 break;
 
             case 0x1D:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.GreaterEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.GreaterEquals);
                 break;
 
             case 0x1E:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.SmallerThan);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.SmallerThan);
                 break;
 
             case 0x1F:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.GreaterThan);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.GreaterThan);
                 break;
 
             default:
@@ -366,11 +378,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         switch (command)
         {
             case 0x0F:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.AndKeyword);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.AndKeyword);
                 break;
 
             case 0x12:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.OrKeyword);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.OrKeyword);
                 break;
 
             default:
@@ -409,19 +421,19 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         switch (command)
         {
             case 0x01:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Minus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Minus);
                 break;
 
             case 0x07:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.ExclamationPoint);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ExclamationPoint);
                 break;
 
             case 0x08:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.PlusPlus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.PlusPlus);
                 break;
 
             case 0x09:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.MinusMinus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.MinusMinus);
                 break;
 
             default:
@@ -442,11 +454,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         switch (command)
         {
             case 0x0A:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.PlusPlus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.PlusPlus);
                 break;
 
             case 0x0B:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.MinusMinus);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.MinusMinus);
                 break;
 
             default:
@@ -469,16 +481,16 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private ArrayIndexerExpressionSyntax CreateArrayIndexerExpression(ExpressionSyntax index)
     {
-        SyntaxToken bracketOpen = syntaxFactory.Token(SyntaxTokenKind.BracketOpen);
-        SyntaxToken bracketClose = syntaxFactory.Token(SyntaxTokenKind.BracketClose);
+        SyntaxToken bracketOpen = _syntaxFactory.Token(SyntaxTokenKind.BracketOpen);
+        SyntaxToken bracketClose = _syntaxFactory.Token(SyntaxTokenKind.BracketClose);
 
         return new ArrayIndexerExpressionSyntax(bracketOpen, index, bracketClose);
     }
 
     private ParenthesizedExpressionSyntax CreateParenthesizedExpression(ExpressionSyntax expression)
     {
-        var parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        var parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        var parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        var parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new ParenthesizedExpressionSyntax(parenOpen, expression, parenClose);
     }
@@ -492,15 +504,15 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         switch (command)
         {
             case 0x20:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.Equals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.Equals);
                 break;
 
             case 0x21:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.PlusEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.PlusEquals);
                 break;
 
             case 0x22:
-                operatorToken = syntaxFactory.Token(SyntaxTokenKind.MinusEquals);
+                operatorToken = _syntaxFactory.Token(SyntaxTokenKind.MinusEquals);
                 break;
 
             default:
@@ -523,30 +535,30 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private MemberAccessExpressionSyntax CreateMemberAccessExpression(Stack<ExpressionSyntax> syntax, string name)
     {
         var left = CreateParenthesizedExpression(syntax.Pop());
-        SyntaxToken operatorToken = syntaxFactory.Token(SyntaxTokenKind.ColonColon);
-        SyntaxToken identifier = syntaxFactory.Identifier(name);
+        SyntaxToken operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ColonColon);
+        SyntaxToken identifier = _syntaxFactory.Identifier(name);
 
         return new MemberAccessExpressionSyntax(left, operatorToken, identifier);
     }
 
     private AssignmentStatementSyntax CreateAssignmentStatement(AssignmentExpressionSyntax assignment)
     {
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new AssignmentStatementSyntax(assignment, semicolon);
     }
 
     private PostfixStatementSyntax CreatePostfixStatement(PostfixExpressionSyntax postfix)
     {
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new PostfixStatementSyntax(postfix, semicolon);
     }
 
     private GotoStatementSyntax CreateGotoStatement(string jumpLabel)
     {
-        SyntaxToken gotoToken = syntaxFactory.Token(SyntaxTokenKind.GotoKeyword);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken gotoToken = _syntaxFactory.Token(SyntaxTokenKind.GotoKeyword);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         var label = CreateStringLiteralExpression(jumpLabel);
 
@@ -555,8 +567,8 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private ReturnStatementSyntax CreateReturnStatement()
     {
-        SyntaxToken returnToken = syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken returnToken = _syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new ReturnStatementSyntax(returnToken, null, semicolon);
     }
@@ -568,7 +580,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
             if (operations[i].Command is not 0x2C)
                 continue;
 
-            SyntaxToken asyncToken = syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
+            SyntaxToken asyncToken = _syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
             var asyncStatements = CreateAsyncBlockBody(operations[index..i]);
 
             index = i + 1;
@@ -581,9 +593,9 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private BlockExpression CreateAsyncBlockBody(Sir0Operation[] operations)
     {
-        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
+        SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
         var expressions = CreateStatements(operations);
-        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
+        SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
@@ -591,14 +603,14 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private MethodInvocationStatementSyntax CreateMethodInvocationStatement(NameSyntax methodName, Sir0Operation operation)
     {
         var method = CreateMethodInvocationExpression(methodName, operation);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new MethodInvocationStatementSyntax(method, semicolon);
     }
 
     private NativeMethodInvocationStatementSyntax CreateNativeMethodInvocationStatement(NativeMethodInvocationExpressionSyntax methodInvocation)
     {
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new NativeMethodInvocationStatementSyntax(methodInvocation, semicolon);
     }
@@ -612,18 +624,18 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private NativeMethodInvocationParametersSyntax CreateNativeMethodInvocationParameters(ExpressionSyntax[] arguments)
     {
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
         var parameterList = new CommaSeparatedSyntaxList<ExpressionSyntax>(arguments);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new NativeMethodInvocationParametersSyntax(parenOpen, parameterList, parenClose);
     }
 
     private MethodInvocationParametersSyntax CreateMethodInvocationParameters(Sir0Operation operation)
     {
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
+        SyntaxToken parenOpen = _syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
         var parameterList = CreateValueList(operation);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
+        SyntaxToken parenClose = _syntaxFactory.Token(SyntaxTokenKind.ParenClose);
 
         return new MethodInvocationParametersSyntax(parenOpen, parameterList, parenClose);
     }
@@ -661,27 +673,22 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
     private LiteralExpressionSyntax CreateNumericLiteralExpression(int value)
     {
-        return new LiteralExpressionSyntax(syntaxFactory.NumericLiteral(value));
+        return new LiteralExpressionSyntax(_syntaxFactory.NumericLiteral(value));
     }
 
     private LiteralExpressionSyntax CreateFloatingNumericLiteralExpression(float value)
     {
-        return new LiteralExpressionSyntax(syntaxFactory.FloatingNumericLiteral(value));
+        return new LiteralExpressionSyntax(_syntaxFactory.FloatingNumericLiteral(value));
     }
 
     private LiteralExpressionSyntax CreateStringLiteralExpression(string value)
     {
-        return new LiteralExpressionSyntax(syntaxFactory.StringLiteral(value));
-    }
-
-    private LiteralExpressionSyntax CreateTrueLiteralExpression()
-    {
-        return new LiteralExpressionSyntax(syntaxFactory.Token(SyntaxTokenKind.TrueKeyword));
+        return new LiteralExpressionSyntax(_syntaxFactory.StringLiteral(value));
     }
 
     private GotoLabelStatementSyntax CreateGotoLabelStatement(string jumpLabel)
     {
-        var colon = syntaxFactory.Token(SyntaxTokenKind.Colon);
+        var colon = _syntaxFactory.Token(SyntaxTokenKind.Colon);
 
         return new GotoLabelStatementSyntax(CreateStringLiteralExpression(jumpLabel), colon);
     }
@@ -689,16 +696,16 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
     private NameSyntax CreateName(string name)
     {
         if (name.Contains('.'))
-            return new SimpleNameSyntax(syntaxFactory.Identifier(name));
+            return new SimpleNameSyntax(_syntaxFactory.Identifier(name));
 
         NameSyntax? result = null;
 
         foreach (string part in name.Split('.').Reverse())
         {
             if (result is null)
-                result = new SimpleNameSyntax(syntaxFactory.Identifier(part));
+                result = new SimpleNameSyntax(_syntaxFactory.Identifier(part));
             else
-                result = new QualifiedNameSyntax(new SimpleNameSyntax(syntaxFactory.Identifier(part)), syntaxFactory.Token(SyntaxTokenKind.Dot), result);
+                result = new QualifiedNameSyntax(new SimpleNameSyntax(_syntaxFactory.Identifier(part)), _syntaxFactory.Token(SyntaxTokenKind.Dot), result);
         }
 
         return result!;
@@ -768,14 +775,14 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         var result = new List<StatementSyntax>();
         for (var i = startIndex; i < endIndex;)
         {
-            if (!skipLoopStart && loopBounds.TryGetValue(i, out LoopBound? loopBound) && loopBound.EndIndex < endIndex)
+            if (!skipLoopStart && loopBounds.TryGetValue(i, out LoopBound loopBound) && loopBound.EndIndex < endIndex)
             {
                 int exitIndex = Math.Min(loopBound.EndIndex + 1, blocks.Count);
                 var nestedContext = new LoopContext(i, loopBound.EndIndex, exitIndex);
                 IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, i,
                     loopBound.EndIndex + 1, out condition, true,
                     nestedContext);
-                result.Add(CreateLoopStatement(loopBound.ConditionKind, bodyStatements, condition));
+                result.Add(_highLevelFactory.CreateLoopStatement(loopBound.ConditionKind, bodyStatements, condition));
                 i = loopBound.EndIndex + 1;
                 continue;
             }
@@ -784,7 +791,7 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
 
             IReadOnlyList<StatementSyntax> statements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, out condition);
             result.AddRange(statements);
-            if (TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition,
+            if (_highLevelDetector.TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition,
                     out StatementSyntax? switchStatement, out int nextSwitchIndex, out int removeLeadingStatements))
             {
                 if (removeLeadingStatements > 0)
@@ -795,10 +802,11 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
                 continue;
             }
 
-            if (TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition, out StatementSyntax? ifStatement,
+            if (_highLevelDetector.TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition,
+                    out StatementSyntax? ifStatement,
                     out int nextIndex))
             {
-                if (TryMergeLoopControlIf(result, ifStatement, out StatementSyntax mergedStatement))
+                if (_highLevelDetector.TryMergeLoopControlIf(result, ifStatement, out StatementSyntax mergedStatement))
                     result[^1] = mergedStatement;
                 else
                     result.Add(ifStatement);
@@ -810,268 +818,6 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         }
 
         return result;
-    }
-
-    private bool TryBuildSwitchStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
-        Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, IReadOnlyList<StatementSyntax> leadingStatements,
-        ExpressionSyntax? condition, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex, out int removeLeadingStatements)
-    {
-        statement = null;
-        nextIndex = index + 1;
-        removeLeadingStatements = 0;
-
-        StatementBlock block = blocks[index];
-        if (block.TerminalCommand is not 0x36 || block.JumpLabel is null)
-            return false;
-
-        if (condition is null)
-            return false;
-
-        if (!TryGetSwitchAssignment(leadingStatements, out LiteralExpressionSyntax switchVariable, out ExpressionSyntax switchValue))
-            return false;
-
-        if (!TryGetSwitchCaseLabel(condition, switchVariable, out ExpressionSyntax firstCaseLabel))
-            return false;
-
-        if (!labelLookup.TryGetValue(block.JumpLabel, out int firstCaseTarget))
-            return false;
-
-        var caseMatches = new List<(ExpressionSyntax Label, int TargetIndex)>
-        {
-            (firstCaseLabel, firstCaseTarget)
-        };
-
-        int currentIndex = index + 1;
-        for (; currentIndex < endIndex; currentIndex++)
-        {
-            StatementBlock nextBlock = blocks[currentIndex];
-            if (nextBlock.TerminalCommand is not 0x36 || nextBlock.JumpLabel is null)
-                break;
-
-            IReadOnlyList<StatementSyntax> blockStatements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, currentIndex, true,
-                out ExpressionSyntax? blockCondition);
-            if (blockStatements.Count > 0)
-                return false;
-
-            if (blockCondition is null)
-                return false;
-
-            if (!TryGetSwitchCaseLabel(blockCondition, switchVariable, out ExpressionSyntax caseLabel))
-                return false;
-
-            if (!labelLookup.TryGetValue(nextBlock.JumpLabel, out int targetIndex))
-                return false;
-
-            caseMatches.Add((caseLabel, targetIndex));
-        }
-
-        if (caseMatches.Count <= 0)
-            return false;
-
-        if (caseMatches.Select(match => match.TargetIndex).Distinct().Count() != caseMatches.Count)
-            return false;
-
-        if (currentIndex >= endIndex)
-            return false;
-
-        StatementBlock endJumpBlock = blocks[currentIndex];
-        if (endJumpBlock.TerminalCommand is not 0x35 || endJumpBlock.JumpLabel is null)
-            return false;
-
-        if (!labelLookup.TryGetValue(endJumpBlock.JumpLabel, out int endLabelIndex))
-            return false;
-
-        if (endLabelIndex <= currentIndex || endLabelIndex > endIndex)
-            return false;
-
-        var caseStartIndices = caseMatches.Select(match => match.TargetIndex).Distinct().OrderBy(target => target).ToList();
-        if (caseStartIndices.Count <= 0)
-            return false;
-
-        if (caseStartIndices[0] <= currentIndex || caseStartIndices[^1] >= endLabelIndex)
-            return false;
-
-        var caseBodies = new Dictionary<int, IReadOnlyList<StatementSyntax>>();
-        for (var caseIndex = 0; caseIndex < caseStartIndices.Count; caseIndex++)
-        {
-            int caseStart = caseStartIndices[caseIndex];
-            int caseEnd = caseIndex + 1 < caseStartIndices.Count ? caseStartIndices[caseIndex + 1] : endLabelIndex;
-            IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, caseStart, caseEnd, out _,
-                false, loopContext);
-            caseBodies[caseStart] = bodyStatements;
-        }
-
-        var cases = new List<CaseStatementSyntax>();
-        foreach ((ExpressionSyntax caseLabel, int targetIndex) in caseMatches)
-        {
-            IReadOnlyList<StatementSyntax> bodyStatements = caseBodies[targetIndex];
-            var caseStatements = new List<StatementSyntax>(bodyStatements);
-            if (caseStatements.Count <= 0 || caseStatements[^1] is not BreakStatementSyntax)
-                caseStatements.Add(CreateBreakStatement());
-
-            cases.Add(CreateCaseStatement(caseLabel, caseStatements));
-        }
-
-        statement = CreateSwitchStatement(switchValue, cases);
-        nextIndex = endLabelIndex;
-        removeLeadingStatements = leadingStatements.Count;
-        return true;
-    }
-
-    private bool TryGetSwitchAssignment(IReadOnlyList<StatementSyntax> statements, out LiteralExpressionSyntax switchVariable,
-        out ExpressionSyntax switchValue)
-    {
-        switchVariable = null!;
-        switchValue = null!;
-
-        if (statements.Count != 1)
-            return false;
-
-        if (statements[0] is not AssignmentStatementSyntax assignment)
-            return false;
-
-        if (assignment.Assignment.Left is not LiteralExpressionSyntax literal)
-            return false;
-
-        switchVariable = literal;
-        switchValue = assignment.Assignment.Right;
-        return true;
-    }
-
-    private static bool TryGetSwitchCaseLabel(ExpressionSyntax condition, LiteralExpressionSyntax switchVariable, out ExpressionSyntax caseLabel)
-    {
-        caseLabel = null!;
-
-        if (condition is not BinaryExpressionSyntax binary ||
-            binary.Operation.RawKind != (int)SyntaxTokenKind.EqualsEquals)
-            return false;
-
-        if (IsMatchingSwitchVariable(binary.Left, switchVariable))
-        {
-            caseLabel = binary.Right;
-            return true;
-        }
-
-        if (IsMatchingSwitchVariable(binary.Right, switchVariable))
-        {
-            caseLabel = binary.Left;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsMatchingSwitchVariable(ExpressionSyntax expression, LiteralExpressionSyntax switchVariable)
-    {
-        return expression is LiteralExpressionSyntax literal &&
-               literal.Literal.Text.Equals(switchVariable.Literal.Text, StringComparison.Ordinal);
-    }
-
-    private bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
-        Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, ExpressionSyntax? condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
-    {
-        statement = null;
-        nextIndex = index + 1;
-
-        StatementBlock block = blocks[index];
-        if (block.TerminalCommand is not (0x36 or 0x37) || block.JumpLabel is null)
-            return false;
-
-        if (!labelLookup.TryGetValue(block.JumpLabel, out int targetIndex))
-            return false;
-
-        if (targetIndex <= index || targetIndex > endIndex)
-            return false;
-
-        if (condition is null)
-            return false;
-
-        if (block.TerminalCommand is 0x37)
-        {
-            int thenStart = index + 1;
-            int thenEnd = targetIndex;
-            if (TryBuildIfElseOnFalse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, loopContext, condition, out statement,
-                    out nextIndex))
-                return true;
-
-            IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, out _, false,
-                loopContext);
-            statement = CreateIfStatement(thenStatements, condition);
-            nextIndex = targetIndex;
-            return true;
-        }
-
-        int elseStart = index + 1;
-        int elseEnd = targetIndex;
-        if (TryBuildIfElseOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, loopContext, condition, out statement, out nextIndex))
-            return true;
-
-        IReadOnlyList<StatementSyntax> notStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, out _, false,
-            loopContext);
-        statement = CreateIfNotStatement(notStatements, condition);
-        nextIndex = targetIndex;
-        return true;
-    }
-
-    private bool TryBuildIfElseOnFalse(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
-        Dictionary<int, LoopBound> loopBounds, int thenStart, int thenEnd, int targetIndex, LoopContext? loopContext, ExpressionSyntax condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
-    {
-        statement = null;
-        nextIndex = targetIndex;
-
-        if (thenStart >= thenEnd)
-            return false;
-
-        StatementBlock endThenBlock = blocks[thenEnd - 1];
-        if (endThenBlock.TerminalCommand is not 0x35 || endThenBlock.JumpLabel is null)
-            return false;
-
-        if (!labelLookup.TryGetValue(endThenBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
-            return false;
-
-        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, out _, false,
-            loopContext);
-        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, out _, false,
-            loopContext);
-
-        if (elseStatements.Count <= 0)
-            return false;
-
-        statement = CreateIfElseStatement(thenStatements, elseStatements, condition);
-        nextIndex = endIndex;
-        return true;
-    }
-
-    private bool TryBuildIfElseOnTrue(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
-        Dictionary<int, LoopBound> loopBounds, int elseStart, int elseEnd, int targetIndex, LoopContext? loopContext, ExpressionSyntax condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
-    {
-        statement = null;
-        nextIndex = targetIndex;
-
-        if (elseStart >= elseEnd)
-            return false;
-
-        StatementBlock endElseBlock = blocks[elseEnd - 1];
-        if (endElseBlock.TerminalCommand is not 0x35 || endElseBlock.JumpLabel is null)
-            return false;
-
-        if (!labelLookup.TryGetValue(endElseBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
-            return false;
-
-        IReadOnlyList<StatementSyntax> thenStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, out _, false,
-            loopContext);
-        IReadOnlyList<StatementSyntax> elseStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, out _, false,
-            loopContext);
-
-        if (elseStatements.Count <= 0)
-            return false;
-
-        statement = CreateIfNotElseStatement(thenStatements, elseStatements, condition);
-        nextIndex = endIndex;
-        return true;
     }
 
     private IReadOnlyList<StatementSyntax> CreateStatementsFromBlock(IReadOnlyList<StatementBlock> blocks,
@@ -1091,18 +837,18 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         if (loopContext is not null && labelLookup is not null && block.TerminalCommand is 0x35 or 0x36 or 0x37 &&
             block.JumpLabel is not null && labelLookup.TryGetValue(block.JumpLabel, out int targetIndex))
         {
-            if (targetIndex == loopContext.StartIndex && blockIndex != loopContext.EndIndex)
+            if (targetIndex == loopContext.Value.StartIndex && blockIndex != loopContext.Value.EndIndex)
             {
                 result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
-                AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Continue, condition);
+                _highLevelFactory.AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Continue, condition);
 
                 return result;
             }
 
-            if (targetIndex == loopContext.ExitIndex)
+            if (targetIndex == loopContext.Value.ExitIndex)
             {
                 result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
-                AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Break, condition);
+                _highLevelFactory.AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Break, condition);
 
                 return result;
             }
@@ -1134,252 +880,4 @@ internal class FsbScriptFileConverter(ISpikeChunsoftSyntaxFactory syntaxFactory,
         return result;
     }
 
-    private IfStatementSyntax CreateIfStatement(IReadOnlyList<StatementSyntax> thenStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        BlockExpression body = CreateBlockExpression(thenStatements);
-
-        return new IfStatementSyntax(ifToken, parenOpen, condition, parenClose, body);
-    }
-
-    private IfElseStatementSyntax CreateIfElseStatement(IReadOnlyList<StatementSyntax> thenStatements, IReadOnlyList<StatementSyntax> elseStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        BlockExpression body = CreateBlockExpression(thenStatements);
-        SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
-        BlockExpression elseBody = CreateElseBlockExpression(elseStatements);
-
-        return new IfElseStatementSyntax(ifToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
-    }
-
-    private IfNotStatementSyntax CreateIfNotStatement(IReadOnlyList<StatementSyntax> thenStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
-        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        BlockExpression body = CreateBlockExpression(thenStatements);
-
-        return new IfNotStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body);
-    }
-
-    private IfNotElseStatementSyntax CreateIfNotElseStatement(IReadOnlyList<StatementSyntax> thenStatements,
-        IReadOnlyList<StatementSyntax> elseStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken ifToken = syntaxFactory.Token(SyntaxTokenKind.IfKeyword);
-        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        BlockExpression body = CreateBlockExpression(thenStatements);
-        SyntaxToken elseToken = syntaxFactory.Token(SyntaxTokenKind.ElseKeyword);
-        BlockExpression elseBody = CreateElseBlockExpression(elseStatements);
-
-        return new IfNotElseStatementSyntax(ifToken, notToken, parenOpen, condition, parenClose, body, elseToken, elseBody);
-    }
-
-    private SwitchStatementSyntax CreateSwitchStatement(ExpressionSyntax expression, IReadOnlyList<CaseStatementSyntax> cases)
-    {
-        SyntaxToken switchToken = syntaxFactory.Token(SyntaxTokenKind.SwitchKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
-        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
-
-        return new SwitchStatementSyntax(switchToken, parenOpen, expression, parenClose, curlyOpen, cases, curlyClose);
-    }
-
-    private CaseStatementSyntax CreateCaseStatement(ExpressionSyntax label, IReadOnlyList<StatementSyntax> statements)
-    {
-        SyntaxToken caseToken = syntaxFactory.Token(SyntaxTokenKind.CaseKeyword);
-        SyntaxToken colon = syntaxFactory.Token(SyntaxTokenKind.Colon);
-
-        return new CaseStatementSyntax(caseToken, label, colon, statements);
-    }
-
-    private DoWhileStatementSyntax CreateDoWhileStatement(IReadOnlyList<StatementSyntax> bodyStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
-        BlockExpression body = CreateBlockExpression(bodyStatements);
-        SyntaxToken whileToken = syntaxFactory.Token(SyntaxTokenKind.WhileKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
-
-        return new DoWhileStatementSyntax(doToken, body, whileToken, parenOpen, condition, parenClose, semicolon);
-    }
-
-    private DoWhileNotStatementSyntax CreateDoWhileNotStatement(IReadOnlyList<StatementSyntax> bodyStatements, ExpressionSyntax condition)
-    {
-        SyntaxToken doToken = syntaxFactory.Token(SyntaxTokenKind.DoKeyword);
-        BlockExpression body = CreateBlockExpression(bodyStatements);
-        SyntaxToken whileToken = syntaxFactory.Token(SyntaxTokenKind.WhileKeyword);
-        SyntaxToken notToken = syntaxFactory.Token(SyntaxTokenKind.NotKeyword);
-        SyntaxToken parenOpen = syntaxFactory.Token(SyntaxTokenKind.ParenOpen);
-        SyntaxToken parenClose = syntaxFactory.Token(SyntaxTokenKind.ParenClose);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
-
-        return new DoWhileNotStatementSyntax(doToken, body, whileToken, notToken, parenOpen, condition, parenClose, semicolon);
-    }
-
-    private StatementSyntax CreateLoopStatement(LoopConditionKind conditionKind, IReadOnlyList<StatementSyntax> bodyStatements, ExpressionSyntax? condition)
-    {
-        if (conditionKind is LoopConditionKind.True)
-            return CreateDoWhileStatement(bodyStatements, CreateTrueLiteralExpression());
-
-        if (condition is null)
-            throw new InvalidOperationException("No condition for loop.");
-
-        return conditionKind switch
-        {
-            LoopConditionKind.Not => CreateDoWhileNotStatement(bodyStatements, condition),
-            LoopConditionKind.Normal => CreateDoWhileStatement(bodyStatements, condition),
-            _ => throw new InvalidOperationException($"Unknown loop condition {conditionKind}.")
-        };
-    }
-
-    private BlockExpression CreateBlockExpression(IReadOnlyList<StatementSyntax> statements)
-    {
-        SyntaxToken curlyOpen = syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
-        SyntaxToken curlyClose = syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
-
-        return new BlockExpression(curlyOpen, statements, curlyClose);
-    }
-
-    private BlockExpression CreateElseBlockExpression(IReadOnlyList<StatementSyntax> statements)
-    {
-        if (IsElseIfCandidate(statements))
-            return CreateInlineBlockExpression(statements);
-
-        return CreateBlockExpression(statements);
-    }
-
-    private static bool IsElseIfCandidate(IReadOnlyList<StatementSyntax> statements)
-    {
-        if (statements.Count != 1)
-            return false;
-
-        return statements[0] is IfStatementSyntax
-            or IfNotStatementSyntax
-            or IfElseStatementSyntax
-            or IfNotElseStatementSyntax;
-    }
-
-    private BlockExpression CreateInlineBlockExpression(IReadOnlyList<StatementSyntax> statements)
-    {
-        SyntaxToken curlyOpen = syntaxFactory.Create(string.Empty, (int)SyntaxTokenKind.CurlyOpen);
-        SyntaxToken curlyClose = syntaxFactory.Create(string.Empty, (int)SyntaxTokenKind.CurlyClose);
-
-        return new BlockExpression(curlyOpen, statements, curlyClose);
-    }
-
-    private bool TryMergeLoopControlIf(List<StatementSyntax> statements, StatementSyntax ifStatement, out StatementSyntax mergedStatement)
-    {
-        mergedStatement = ifStatement;
-        if (statements.Count == 0)
-            return false;
-
-        if (statements[^1] is not IfElseStatementSyntax controlIf)
-            return false;
-
-        if (!IsEmptyBlock(controlIf.Body))
-            return false;
-
-        if (!TryGetLoopControlStatement(controlIf.ElseBody, out StatementSyntax loopControl))
-            return false;
-
-        if (ifStatement is not IfStatementSyntax ifOnlyStatement)
-            return false;
-
-        if (!ReferenceEquals(controlIf.Condition, ifOnlyStatement.Condition))
-            return false;
-
-        mergedStatement = CreateIfElseStatement(ifOnlyStatement.Body.Statements, [loopControl], controlIf.Condition);
-        return true;
-    }
-
-    private static bool IsEmptyBlock(BlockExpression blockExpression)
-    {
-        return blockExpression.Statements.Count == 0;
-    }
-
-    private bool TryGetLoopControlStatement(BlockExpression elseBody, out StatementSyntax loopControl)
-    {
-        loopControl = null!;
-        if (elseBody.Statements.Count != 1)
-            return false;
-
-        return elseBody.Statements[0] switch
-        {
-            BreakStatementSyntax => TryCreateLoopControlStatement(LoopControlKind.Break, out loopControl),
-            ContinueStatementSyntax => TryCreateLoopControlStatement(LoopControlKind.Continue, out loopControl),
-            _ => false
-        };
-    }
-
-    private bool TryCreateLoopControlStatement(LoopControlKind kind, out StatementSyntax loopControl)
-    {
-        loopControl = kind == LoopControlKind.Break ? CreateBreakStatement() : CreateContinueStatement();
-        return true;
-    }
-
-    private void AddLoopControlStatements(List<StatementSyntax> target, byte terminalCommand, LoopControlKind controlKind, ExpressionSyntax? condition)
-    {
-        if (terminalCommand is 0x35)
-        {
-            target.Add(controlKind == LoopControlKind.Break ? CreateBreakStatement() : CreateContinueStatement());
-            return;
-        }
-
-        if (condition is null)
-            throw new InvalidOperationException("No condition for loop.");
-
-        if (terminalCommand is 0x36)
-        {
-            target.Add(CreateIfStatement([controlKind == LoopControlKind.Break ? CreateBreakStatement() : CreateContinueStatement()], condition));
-            return;
-        }
-
-        if (terminalCommand is 0x37)
-        {
-            StatementSyntax elseStatement = controlKind == LoopControlKind.Break ? CreateBreakStatement() : CreateContinueStatement();
-            target.Add(CreateIfElseStatement([], [elseStatement], condition));
-        }
-    }
-
-    private BreakStatementSyntax CreateBreakStatement()
-    {
-        SyntaxToken breakToken = syntaxFactory.Token(SyntaxTokenKind.BreakKeyword);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
-
-        return new BreakStatementSyntax(breakToken, semicolon);
-    }
-
-    private ContinueStatementSyntax CreateContinueStatement()
-    {
-        SyntaxToken continueToken = syntaxFactory.Token(SyntaxTokenKind.ContinueKeyword);
-        SyntaxToken semicolon = syntaxFactory.Token(SyntaxTokenKind.Semicolon);
-
-        return new ContinueStatementSyntax(continueToken, semicolon);
-    }
-
-    private sealed record LoopContext(int StartIndex, int EndIndex, int ExitIndex);
-
-    private sealed record LoopBound(int EndIndex, LoopConditionKind ConditionKind);
-
-    private enum LoopConditionKind
-    {
-        Normal,
-        Not,
-        True
-    }
-
-    private enum LoopControlKind
-    {
-        Break,
-        Continue
-    }
 }

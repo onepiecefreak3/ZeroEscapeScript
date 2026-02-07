@@ -1,54 +1,47 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
-namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft
+public class AssignmentExpressionSyntax : ExpressionSyntax
 {
-    public class AssignmentExpressionSyntax : ExpressionSyntax
+    public ExpressionSyntax Left { get; private set; }
+    public SyntaxToken Operation { get; private set; }
+    public ExpressionSyntax Right { get; private set; }
+
+    public override SyntaxLocation Location => Left.Location;
+    public override SyntaxSpan Span => new(Left.Span.Position, Right.Span.EndPosition);
+
+    public AssignmentExpressionSyntax(ExpressionSyntax left, SyntaxToken operation, ExpressionSyntax right)
     {
-        public ExpressionSyntax Left { get; private set; }
-        public SyntaxToken Operation { get; private set; }
-        public ExpressionSyntax Right { get; private set; }
+        left.Parent = this;
+        operation.Parent = this;
+        right.Parent = this;
 
-        public override SyntaxLocation Location => Left.Location;
-        public override SyntaxSpan Span => new(Left.Span.Position, Right.Span.EndPosition);
+        Left = left;
+        Operation = operation;
+        Right = right;
 
-        public AssignmentExpressionSyntax(ExpressionSyntax left, SyntaxToken operation, ExpressionSyntax right)
-        {
-            left.Parent = this;
-            operation.Parent = this;
-            right.Parent = this;
+        Root.Update();
+    }
 
-            Left = left;
-            Operation = operation;
-            Right = right;
+    public void SetOperator(SyntaxToken @operator, bool updatePositions = true)
+    {
+        @operator.Parent = this;
 
+        Operation = @operator;
+
+        if (updatePositions)
             Root.Update();
-        }
+    }
 
-        public void SetOperator(SyntaxToken @operator, bool updatePositions = true)
-        {
-            @operator.Parent = this;
+    internal override int UpdatePosition(int position, ref int line, ref int column)
+    {
+        SyntaxToken @operator = Operation;
 
-            Operation = @operator;
+        position = Left.UpdatePosition(position, ref line, ref column);
+        position = @operator.UpdatePosition(position, ref line, ref column);
+        position = Right.UpdatePosition(position, ref line, ref column);
 
-            if (updatePositions)
-                Root.Update();
-        }
+        Operation = @operator;
 
-        internal override int UpdatePosition(int position, ref int line, ref int column)
-        {
-            SyntaxToken @operator = Operation;
-
-            position = Left.UpdatePosition(position, ref line, ref column);
-            position = @operator.UpdatePosition(position, ref line, ref column);
-            position = Right.UpdatePosition(position, ref line, ref column);
-
-            Operation = @operator;
-
-            return position;
-        }
+        return position;
     }
 }
