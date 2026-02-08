@@ -21,10 +21,14 @@ class CreateFsbWorkflow(
         string readableScript = streamReader.ReadToEnd();
 
         // Convert to script data
-        CodeUnitSyntax codeUnit = scriptParser.ParseCodeUnit(readableScript);
-        Sir0Function[] functions = treeConverter.CreateScriptFile(codeUnit);
+        var exportedLabels = new HashSet<string>();
 
+        CodeUnitSyntax codeUnit = scriptParser.ParseCodeUnit(readableScript);
+        Sir0Function[] functions = treeConverter.CreateScriptFile(codeUnit, exportedLabels, out string name);
+
+        donorScript.Name = name;
         donorScript.Functions = functions;
+        donorScript.ExportedLabels = [.. exportedLabels];
 
         // Write script data
         scriptWriter.Write(donorScript, output);

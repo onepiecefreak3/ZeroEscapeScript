@@ -17,12 +17,28 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
     private void NormalizeCodeUnit(CodeUnitSyntax codeUnit, WhitespaceNormalizeContext ctx)
     {
+        NormalizeNameDeclaration(codeUnit.NameDeclaration, ctx);
+
         foreach (MethodDeclarationSyntax methodDeclaration in codeUnit.MethodDeclarations)
         {
             ctx.IsFirstElement = codeUnit.MethodDeclarations[0] == methodDeclaration;
             ctx.ShouldLineBreak = codeUnit.MethodDeclarations[^1] != methodDeclaration;
             NormalizeMethodDeclaration(methodDeclaration, ctx);
         }
+    }
+
+    private void NormalizeNameDeclaration(NameDeclarationSyntax nameDeclaration, WhitespaceNormalizeContext ctx)
+    {
+        SyntaxToken nameKeyword = nameDeclaration.NameToken.WithLeadingTrivia(null).WithTrailingTrivia(" ");
+        SyntaxToken newSemicolon = nameDeclaration.Semicolon.WithLeadingTrivia(null).WithTrailingTrivia("\r\n\r\n");
+
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        ctx.IsFirstElement = true;
+        NormalizeLiteralExpression(nameDeclaration.Name, ctx);
+
+        nameDeclaration.SetNameToken(nameKeyword, false);
+        nameDeclaration.SetSemicolon(newSemicolon, false);
     }
 
     private void NormalizeMethodDeclaration(MethodDeclarationSyntax methodDeclaration, WhitespaceNormalizeContext ctx)
@@ -107,6 +123,10 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
             case PostfixStatementSyntax postfix:
                 NormalizePostfixStatement(postfix, ctx);
+                break;
+
+            case ExportedGotoLabelStatementSyntax exportedGotoLabel:
+                NormalizeExportedGotoLabelStatement(exportedGotoLabel, ctx);
                 break;
 
             case GotoLabelStatementSyntax gotoLabel:
@@ -201,6 +221,27 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         NormalizePostfixExpression(postfixStatement.Postfix, ctx);
 
         postfixStatement.SetSemicolon(newSemicolon, false);
+    }
+
+    private void NormalizeExportedGotoLabelStatement(ExportedGotoLabelStatementSyntax exportedGotoLabelStatement, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent - 1);
+
+        SyntaxToken newExport = exportedGotoLabelStatement.Export.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(" ");
+        SyntaxToken newColon = exportedGotoLabelStatement.Colon.WithNoTrivia();
+
+        if (ctx.ShouldLineBreak)
+            newColon = newColon.WithTrailingTrivia("\r\n");
+
+        exportedGotoLabelStatement.SetExport(newExport, false);
+        exportedGotoLabelStatement.SetColon(newColon, false);
+
+        ctx.ShouldIndent = false;
+        ctx.ShouldLineBreak = false;
+        ctx.IsFirstElement = true;
+        NormalizeLiteralExpression(exportedGotoLabelStatement.Label, ctx);
     }
 
     private void NormalizeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, WhitespaceNormalizeContext ctx)

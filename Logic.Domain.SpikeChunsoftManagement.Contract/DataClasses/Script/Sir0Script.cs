@@ -4,6 +4,6 @@ public class Sir0Script
 {
     public required string Name { get; set; }
     public required Sir0Function[] Functions { get; set; }
-    public required string[] Texts2 { get; set; }
+    public required string[] ExportedLabels { get; set; }
     public required string[] Texts3 { get; set; }
 }

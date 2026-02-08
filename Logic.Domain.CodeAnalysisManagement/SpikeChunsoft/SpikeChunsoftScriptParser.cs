@@ -49,9 +49,19 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private CodeUnitSyntax ParseCodeUnit(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
+        var nameDeclaration = ParseNameDeclaration(buffer);
         var methodDeclarations = ParseMethodDeclarations(buffer);
 
-        return new CodeUnitSyntax(methodDeclarations);
+        return new CodeUnitSyntax(nameDeclaration, methodDeclarations);
+    }
+
+    private NameDeclarationSyntax ParseNameDeclaration(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken nameKeyword = ParseNameKeyword(buffer);
+        var literal = ParseStringLiteralExpression(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new NameDeclarationSyntax(nameKeyword, literal, semicolon);
     }
 
     private IReadOnlyList<MethodDeclarationSyntax> ParseMethodDeclarations(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -128,6 +138,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private bool IsStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return HasTokenKind(buffer, SyntaxTokenKind.GotoKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.ExportKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword) ||
@@ -150,6 +161,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     {
         if (IsPostfixStatement(buffer))
             return ParsePostfixStatement(buffer);
+
+        if (IsExportedGotoLabelStatement(buffer))
+            return ParseExportedGotoLabelStatement(buffer);
 
         if (IsGotoLabelStatement(buffer))
             return ParseGotoLabelStatement(buffer);
@@ -212,6 +226,13 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
                 HasTokenKind(buffer, 1, SyntaxTokenKind.MinusMinus));
     }
 
+    private bool IsExportedGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return HasTokenKind(buffer, SyntaxTokenKind.ExportKeyword) &&
+               HasTokenKind(buffer, 1, SyntaxTokenKind.StringLiteral) &&
+               HasTokenKind(buffer, 2, SyntaxTokenKind.Colon);
+    }
+
     private bool IsGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
@@ -260,6 +281,15 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
         return new ReturnStatementSyntax(returnToken, returnValue, semicolon);
+    }
+
+    private ExportedGotoLabelStatementSyntax ParseExportedGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken export = ParseExportKeywordToken(buffer);
+        LiteralExpressionSyntax identifier = ParseStringLiteralExpression(buffer);
+        SyntaxToken colon = ParseColonToken(buffer);
+
+        return new ExportedGotoLabelStatementSyntax(export, identifier, colon);
     }
 
     private GotoLabelStatementSyntax ParseGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -1116,6 +1146,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return CreateToken(buffer, SyntaxTokenKind.ContinueKeyword);
     }
 
+    private SyntaxToken ParseExportKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.ExportKeyword);
+    }
+
     private SyntaxToken ParseTrueKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.TrueKeyword);
@@ -1139,6 +1174,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseGotoKeyword(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.GotoKeyword);
+    }
+
+    private SyntaxToken ParseNameKeyword(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.NameKeyword);
     }
 
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

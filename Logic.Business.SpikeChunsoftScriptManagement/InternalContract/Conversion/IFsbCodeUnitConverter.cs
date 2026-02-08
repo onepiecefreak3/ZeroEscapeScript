@@ -5,5 +5,5 @@ namespace Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversi
 
 public interface IFsbCodeUnitConverter
 {
-    Sir0Function[] CreateScriptFile(CodeUnitSyntax tree);
+    Sir0Function[] CreateScriptFile(CodeUnitSyntax tree, HashSet<string> exportedLabels, out string name);
 }

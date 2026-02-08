@@ -15,7 +15,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
         {
             Name = scriptData.Name,
             Functions = functions,
-            Texts2 = scriptData.Texts2,
+            ExportedLabels = scriptData.ExportedLabels,
             Texts3 = scriptData.Texts3
         };
     }
@@ -107,7 +107,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
                 case 0x34:
                     i += 3;
                     int index3 = BinaryPrimitives.ReadInt16LittleEndian(functionData.Data.AsSpan(i - 2));
-                    operations.Add(new Sir0Operation(jumpLabel, functionData.Data[i - 3], [scriptData.Texts1[index3]]));
+                    operations.Add(new Sir0Operation(jumpLabel, functionData.Data[i - 3], [scriptData.Strings[index3]]));
                     break;
 
                 case 0x2E: //*
@@ -140,7 +140,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
                         case 0xF1:
                             i += 4;
                             int index = BinaryPrimitives.ReadInt16LittleEndian(functionData.Data.AsSpan(i - 2));
-                            operations.Add(new Sir0Operation(jumpLabel, 0xF1, [scriptData.Texts1[index]]));
+                            operations.Add(new Sir0Operation(jumpLabel, 0xF1, [scriptData.Strings[index]]));
                             break;
 
                         case 0xF4:
@@ -148,8 +148,8 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
                             int index1 = BinaryPrimitives.ReadInt16LittleEndian(functionData.Data.AsSpan(i - 4));
                             int index2 = BinaryPrimitives.ReadInt16LittleEndian(functionData.Data.AsSpan(i - 2));
                             operations.Add(index2 != 0
-                                ? new Sir0Operation(jumpLabel, 0xF4, [scriptData.Texts1[index1], scriptData.Texts1[index2]])
-                                : new Sir0Operation(jumpLabel, 0xF4, [scriptData.Texts1[index1]]));
+                                ? new Sir0Operation(jumpLabel, 0xF4, [scriptData.Strings[index1], scriptData.Strings[index2]])
+                                : new Sir0Operation(jumpLabel, 0xF4, [scriptData.Strings[index1]]));
                             break;
                     }
                     break;

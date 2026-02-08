@@ -24,8 +24,8 @@ internal class FsbComposer : IFsbComposer
         {
             Name = script.Name,
             Functions = [.. result],
-            Texts1 = texts,
-            Texts2 = script.Texts2,
+            Strings = texts,
+            ExportedLabels = script.ExportedLabels,
             Texts3 = script.Texts3
         };
     }

@@ -6,12 +6,12 @@ using Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 namespace Logic.Business.SpikeChunsoftScriptManagement.Conversion;
 
 internal delegate IReadOnlyList<StatementSyntax> BuildStatementsRangeDelegate(IReadOnlyList<StatementBlock> blocks,
-    Dictionary<string, int> labelLookup, Dictionary<int, LoopBound> loopBounds, int startIndex, int endIndex,
+    Dictionary<string, int> labelLookup, Dictionary<int, LoopBound> loopBounds, int startIndex, int endIndex, string[] exportedLabels,
     out ExpressionSyntax? condition, bool skipLoopStart, LoopContext? loopContext);
 
 internal delegate IReadOnlyList<StatementSyntax> CreateStatementsFromBlockDelegate(IReadOnlyList<StatementBlock> blocks,
     IReadOnlyDictionary<string, int>? labelLookup, LoopContext? loopContext, int blockIndex, bool skipTerminalJump,
-    out ExpressionSyntax? condition);
+    string[] exportedLabels, out ExpressionSyntax? condition);
 
 internal class HighLevelSyntaxPatternDetector
 {
@@ -29,7 +29,7 @@ internal class HighLevelSyntaxPatternDetector
 
     public bool TryBuildSwitchStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
         Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, IReadOnlyList<StatementSyntax> leadingStatements,
-        ExpressionSyntax? condition, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex, out int removeLeadingStatements)
+        ExpressionSyntax? condition, string[] exportedLabels, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex, out int removeLeadingStatements)
     {
         statement = null;
         nextIndex = index + 1;
@@ -64,7 +64,7 @@ internal class HighLevelSyntaxPatternDetector
                 break;
 
             IReadOnlyList<StatementSyntax> blockStatements = _createStatementsFromBlock(blocks, labelLookup, loopContext, currentIndex, true,
-                out ExpressionSyntax? blockCondition);
+                exportedLabels, out ExpressionSyntax? blockCondition);
             if (blockStatements.Count > 0)
                 return false;
 
@@ -111,7 +111,7 @@ internal class HighLevelSyntaxPatternDetector
         {
             int caseStart = caseStartIndices[caseIndex];
             int caseEnd = caseIndex + 1 < caseStartIndices.Count ? caseStartIndices[caseIndex + 1] : endLabelIndex;
-            IReadOnlyList<StatementSyntax> bodyStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, caseStart, caseEnd, out _,
+            IReadOnlyList<StatementSyntax> bodyStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, caseStart, caseEnd, exportedLabels, out _,
                 false, loopContext);
             caseBodies[caseStart] = bodyStatements;
         }
@@ -135,7 +135,7 @@ internal class HighLevelSyntaxPatternDetector
 
     public bool TryBuildIfStatement(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
         Dictionary<int, LoopBound> loopBounds, int index, int endIndex, LoopContext? loopContext, ExpressionSyntax? condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
+        string[] exportedLabels, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = index + 1;
@@ -157,11 +157,11 @@ internal class HighLevelSyntaxPatternDetector
         {
             int thenStart = index + 1;
             int thenEnd = targetIndex;
-            if (TryBuildIfElseOnFalse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, loopContext, condition, out statement,
+            if (TryBuildIfElseOnFalse(blocks, labelLookup, loopBounds, thenStart, thenEnd, targetIndex, loopContext, condition, exportedLabels, out statement,
                     out nextIndex))
                 return true;
 
-            IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, out _, false,
+            IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, exportedLabels, out _, false,
                 loopContext);
             statement = _factory.CreateIfStatement(thenStatements, condition);
             nextIndex = targetIndex;
@@ -170,11 +170,11 @@ internal class HighLevelSyntaxPatternDetector
 
         int elseStart = index + 1;
         int elseEnd = targetIndex;
-        if (TryBuildIfElseOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, loopContext, condition, out statement,
+        if (TryBuildIfElseOnTrue(blocks, labelLookup, loopBounds, elseStart, elseEnd, targetIndex, loopContext, condition, exportedLabels, out statement,
                 out nextIndex))
             return true;
 
-        IReadOnlyList<StatementSyntax> notStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, out _, false,
+        IReadOnlyList<StatementSyntax> notStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, exportedLabels, out _, false,
             loopContext);
         statement = _factory.CreateIfNotStatement(notStatements, condition);
         nextIndex = targetIndex;
@@ -208,7 +208,7 @@ internal class HighLevelSyntaxPatternDetector
 
     private bool TryBuildIfElseOnFalse(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
         Dictionary<int, LoopBound> loopBounds, int thenStart, int thenEnd, int targetIndex, LoopContext? loopContext, ExpressionSyntax condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
+        string[] exportedLabels, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = targetIndex;
@@ -223,9 +223,9 @@ internal class HighLevelSyntaxPatternDetector
         if (!labelLookup.TryGetValue(endThenBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
             return false;
 
-        IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, out _, false,
+        IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, thenStart, thenEnd, exportedLabels, out _, false,
             loopContext);
-        IReadOnlyList<StatementSyntax> elseStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, out _, false,
+        IReadOnlyList<StatementSyntax> elseStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, exportedLabels, out _, false,
             loopContext);
 
         if (elseStatements.Count <= 0)
@@ -238,7 +238,7 @@ internal class HighLevelSyntaxPatternDetector
 
     private bool TryBuildIfElseOnTrue(IReadOnlyList<StatementBlock> blocks, Dictionary<string, int> labelLookup,
         Dictionary<int, LoopBound> loopBounds, int elseStart, int elseEnd, int targetIndex, LoopContext? loopContext, ExpressionSyntax condition,
-        [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
+        string[] exportedLabels, [NotNullWhen(true)] out StatementSyntax? statement, out int nextIndex)
     {
         statement = null;
         nextIndex = targetIndex;
@@ -253,9 +253,9 @@ internal class HighLevelSyntaxPatternDetector
         if (!labelLookup.TryGetValue(endElseBlock.JumpLabel, out int endIndex) || endIndex <= targetIndex)
             return false;
 
-        IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, out _, false,
+        IReadOnlyList<StatementSyntax> thenStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, elseStart, elseEnd, exportedLabels, out _, false,
             loopContext);
-        IReadOnlyList<StatementSyntax> elseStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, out _, false,
+        IReadOnlyList<StatementSyntax> elseStatements = _buildStatementsRange(blocks, labelLookup, loopBounds, targetIndex, endIndex, exportedLabels, out _, false,
             loopContext);
 
         if (elseStatements.Count <= 0)

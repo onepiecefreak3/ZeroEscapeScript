@@ -67,28 +67,38 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         _highLevelDetector = new HighLevelSyntaxPatternDetector(_highLevelFactory, BuildStatementsRange, CreateStatementsFromBlock);
     }
 
-    public CodeUnitSyntax CreateCodeUnit(Sir0Function[] functions)
+    public CodeUnitSyntax CreateCodeUnit(Sir0Script script)
     {
-        IReadOnlyList<MethodDeclarationSyntax> methods = CreateMethodDeclarations(functions);
+        NameDeclarationSyntax name = CreateNameDeclaration(script);
+        IReadOnlyList<MethodDeclarationSyntax> methods = CreateMethodDeclarations(script);
 
-        return new CodeUnitSyntax(methods);
+        return new CodeUnitSyntax(name, methods);
     }
 
-    private IReadOnlyList<MethodDeclarationSyntax> CreateMethodDeclarations(Sir0Function[] functions)
+    private NameDeclarationSyntax CreateNameDeclaration(Sir0Script script)
     {
-        var result = new List<MethodDeclarationSyntax>(functions.Length);
+        SyntaxToken nameToken = _syntaxFactory.Token(SyntaxTokenKind.NameKeyword);
+        var nameLiteral = CreateStringLiteralExpression(script.Name);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
-        foreach (Sir0Function function in functions)
-            result.Add(CreateMethodDeclaration(function));
+        return new NameDeclarationSyntax(nameToken, nameLiteral, semicolon);
+    }
+
+    private IReadOnlyList<MethodDeclarationSyntax> CreateMethodDeclarations(Sir0Script script)
+    {
+        var result = new List<MethodDeclarationSyntax>(script.Functions.Length);
+
+        foreach (Sir0Function function in script.Functions)
+            result.Add(CreateMethodDeclaration(function, script.ExportedLabels));
 
         return [.. result];
     }
 
-    private MethodDeclarationSyntax CreateMethodDeclaration(Sir0Function function)
+    private MethodDeclarationSyntax CreateMethodDeclaration(Sir0Function function, string[] exportedLabels)
     {
         var name = CreateStringLiteralExpression(function.Name);
         var parameters = CreateMethodDeclarationParameters();
-        var body = CreateMethodDeclarationBody(function);
+        var body = CreateMethodDeclarationBody(function, exportedLabels);
 
         return new MethodDeclarationSyntax(name, parameters, body);
     }
@@ -101,27 +111,27 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new MethodDeclarationParametersSyntax(parenOpen, null, parenClose);
     }
 
-    private BlockExpression CreateMethodDeclarationBody(Sir0Function function)
+    private BlockExpression CreateMethodDeclarationBody(Sir0Function function, string[] exportedLabels)
     {
         SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
-        var expressions = CreateStatements(function);
+        var expressions = CreateStatements(function, exportedLabels);
         SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
         return new BlockExpression(curlyOpen, expressions, curlyClose);
     }
 
-    private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Function function)
+    private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Function function, string[] exportedLabels)
     {
-        return CreateStatements(function.Operations);
+        return CreateStatements(function.Operations, exportedLabels);
     }
 
-    private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations)
+    private IReadOnlyList<StatementSyntax> CreateStatements(Sir0Operation[] operations, string[] exportedLabels)
     {
         IReadOnlyList<StatementBlock> blocks = _blockBuilder.Build(operations);
-        return CreateStatements(blocks);
+        return CreateStatements(blocks, exportedLabels);
     }
 
-    private StatementSyntax? CreateStatement(Stack<ExpressionSyntax> expressionStack, Sir0Operation[] operations, ref int index)
+    private StatementSyntax? CreateStatement(Stack<ExpressionSyntax> expressionStack, Sir0Operation[] operations, ref int index, string[] exportedLabels)
     {
         while (index < operations.Length)
         {
@@ -148,16 +158,16 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                     throw new InvalidOperationException("Could not create statement from expression.");
 
                 case 0x2B:
-                    return CreateAsyncBlockStatement(operations, ref index);
+                    return CreateAsyncBlockStatement(operations, ref index, exportedLabels);
 
                 case 0x30:
                     return CreateReturnStatement();
 
                 case 0x33:
                     return CreateGotoStatement(operation);
-                
+
                 case 0x34:
-                    return CreateGotoLabelStatement(operation);
+                    return CreateGotoLabelStatement(operation, exportedLabels);
 
                 case 0x36:
                 case 0x37:
@@ -579,16 +589,23 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new GotoStatementSyntax(gotoToken, label, semicolon);
     }
 
-    private GotoLabelStatementSyntax CreateGotoLabelStatement(Sir0Operation operation)
+    private StatementSyntax CreateGotoLabelStatement(Sir0Operation operation, string[] exportedLabels)
     {
         SyntaxToken colon = _syntaxFactory.Token(SyntaxTokenKind.Colon);
 
-        var label = CreateStringLiteralExpression((string)operation.Arguments[0]);
+        var label = (string)operation.Arguments[0];
+        var labelLiteral = CreateStringLiteralExpression(label);
 
-        return new GotoLabelStatementSyntax(label, colon);
+        if (exportedLabels.Contains(label))
+        {
+            SyntaxToken export = _syntaxFactory.Token(SyntaxTokenKind.ExportKeyword);
+            return new ExportedGotoLabelStatementSyntax(export, labelLiteral, colon);
+        }
+
+        return new GotoLabelStatementSyntax(labelLiteral, colon);
     }
 
-    private AsyncBlockStatement CreateAsyncBlockStatement(Sir0Operation[] operations, ref int index)
+    private AsyncBlockStatement CreateAsyncBlockStatement(Sir0Operation[] operations, ref int index, string[] exportedLabels)
     {
         for (var i = index; i < operations.Length; i++)
         {
@@ -596,7 +613,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 continue;
 
             SyntaxToken asyncToken = _syntaxFactory.Token(SyntaxTokenKind.AsyncKeyword);
-            var asyncStatements = CreateAsyncBlockBody(operations[index..i]);
+            var asyncStatements = CreateAsyncBlockBody(operations[index..i], exportedLabels);
 
             index = i + 1;
 
@@ -606,13 +623,13 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         throw new InvalidOperationException("Incomplete async block.");
     }
 
-    private BlockExpression CreateAsyncBlockBody(Sir0Operation[] operations)
+    private BlockExpression CreateAsyncBlockBody(Sir0Operation[] operations, string[] exportedLabels)
     {
         SyntaxToken curlyOpen = _syntaxFactory.Token(SyntaxTokenKind.CurlyOpen);
-        var expressions = CreateStatements(operations);
+        var statements = CreateStatements(operations, exportedLabels);
         SyntaxToken curlyClose = _syntaxFactory.Token(SyntaxTokenKind.CurlyClose);
 
-        return new BlockExpression(curlyOpen, expressions, curlyClose);
+        return new BlockExpression(curlyOpen, statements, curlyClose);
     }
 
     private MethodInvocationStatementSyntax CreateMethodInvocationStatement(NameSyntax methodName, Sir0Operation operation)
@@ -719,7 +736,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return result!;
     }
 
-    private IReadOnlyList<StatementSyntax> CreateStatements(IReadOnlyList<StatementBlock> blocks)
+    private IReadOnlyList<StatementSyntax> CreateStatements(IReadOnlyList<StatementBlock> blocks, string[] exportedLabels)
     {
         if (blocks.Count == 0)
             return [];
@@ -727,7 +744,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         Dictionary<string, int> labelLookup = CreateLabelLookup(blocks);
         Dictionary<int, LoopBound> loopBounds = CreateLoopBounds(blocks, labelLookup);
 
-        return BuildStatementsRange(blocks, labelLookup, loopBounds, 0, blocks.Count, out _);
+        return BuildStatementsRange(blocks, labelLookup, loopBounds, 0, blocks.Count, exportedLabels, out _);
     }
 
     private Dictionary<string, int> CreateLabelLookup(IReadOnlyList<StatementBlock> blocks)
@@ -776,7 +793,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private IReadOnlyList<StatementSyntax> BuildStatementsRange(IReadOnlyList<StatementBlock> blocks,
         Dictionary<string, int> labelLookup, Dictionary<int, LoopBound> loopBounds, int startIndex, int endIndex,
-        out ExpressionSyntax? condition, bool skipLoopStart = false, LoopContext? loopContext = null)
+        string[] exportedLabels, out ExpressionSyntax? condition, bool skipLoopStart = false, LoopContext? loopContext = null)
     {
         condition = null;
 
@@ -788,7 +805,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 int exitIndex = Math.Min(loopBound.EndIndex + 1, blocks.Count);
                 var nestedContext = new LoopContext(i, loopBound.EndIndex, exitIndex);
                 IReadOnlyList<StatementSyntax> bodyStatements = BuildStatementsRange(blocks, labelLookup, loopBounds, i,
-                    loopBound.EndIndex + 1, out condition, true,
+                    loopBound.EndIndex + 1, exportedLabels, out condition, true,
                     nestedContext);
                 result.Add(_highLevelFactory.CreateLoopStatement(loopBound.ConditionKind, bodyStatements, condition));
                 i = loopBound.EndIndex + 1;
@@ -797,9 +814,9 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
             skipLoopStart = false;
 
-            IReadOnlyList<StatementSyntax> statements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, out condition);
+            IReadOnlyList<StatementSyntax> statements = CreateStatementsFromBlock(blocks, labelLookup, loopContext, i, true, exportedLabels, out condition);
             result.AddRange(statements);
-            if (_highLevelDetector.TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition,
+            if (_highLevelDetector.TryBuildSwitchStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, statements, condition, exportedLabels,
                     out StatementSyntax? switchStatement, out int nextSwitchIndex, out int removeLeadingStatements))
             {
                 if (removeLeadingStatements > 0)
@@ -810,9 +827,8 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 continue;
             }
 
-            if (_highLevelDetector.TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition,
-                    out StatementSyntax? ifStatement,
-                    out int nextIndex))
+            if (_highLevelDetector.TryBuildIfStatement(blocks, labelLookup, loopBounds, i, endIndex, loopContext, condition, exportedLabels,
+                    out StatementSyntax? ifStatement, out int nextIndex))
             {
                 if (_highLevelDetector.TryMergeLoopControlIf(result, ifStatement, out StatementSyntax mergedStatement))
                     result[^1] = mergedStatement;
@@ -830,7 +846,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private IReadOnlyList<StatementSyntax> CreateStatementsFromBlock(IReadOnlyList<StatementBlock> blocks,
         IReadOnlyDictionary<string, int>? labelLookup, LoopContext? loopContext, int blockIndex, bool skipTerminalJump,
-        out ExpressionSyntax? condition)
+        string[] exportedLabels, out ExpressionSyntax? condition)
     {
         condition = null;
 
@@ -847,7 +863,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         {
             if (targetIndex == loopContext.Value.StartIndex && blockIndex != loopContext.Value.EndIndex)
             {
-                result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
+                result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, exportedLabels, out condition));
                 _highLevelFactory.AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Continue, condition);
 
                 return result;
@@ -855,7 +871,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
             if (targetIndex == loopContext.Value.ExitIndex)
             {
-                result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, out condition));
+                result.AddRange(CreateStatementsFromBlock(blocks, labelLookup, null, blockIndex, true, exportedLabels, out condition));
                 _highLevelFactory.AddLoopControlStatements(result, block.TerminalCommand.Value, LoopControlKind.Break, condition);
 
                 return result;
@@ -872,7 +888,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 continue;
             }
 
-            StatementSyntax? statement = CreateStatement(expressionStack, blockOperations, ref index);
+            StatementSyntax? statement = CreateStatement(expressionStack, blockOperations, ref index, exportedLabels);
             if (statement is null)
                 continue;
 

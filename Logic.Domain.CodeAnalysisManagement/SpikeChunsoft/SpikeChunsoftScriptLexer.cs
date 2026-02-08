@@ -537,6 +537,12 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
             case "continue":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ContinueKeyword, position, line, column, finalValue);
 
+            case "export":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.ExportKeyword, position, line, column, finalValue);
+
+            case "name":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NameKeyword, position, line, column, finalValue);
+                
             default:
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Identifier, position, line, column, finalValue);
         }

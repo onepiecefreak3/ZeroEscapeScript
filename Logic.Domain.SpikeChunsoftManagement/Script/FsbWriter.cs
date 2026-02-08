@@ -22,8 +22,8 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
 
         int[] functionOffsets = WriteFunctions(writer, data.Functions);
 
-        int text1Offset = WriteStrings(writer, data.Texts1);
-        int text2Offset = WriteStrings(writer, data.Texts2);
+        int text1Offset = WriteStrings(writer, data.Strings);
+        int text2Offset = WriteStrings(writer, data.ExportedLabels);
         int text3Offset = WriteStrings(writer, data.Texts3);
 
         int functionOffset = WriteFunctionEntries(writer, data.Functions, functionOffsets);
@@ -109,7 +109,7 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
 
         writer.Write(nameOffset);
         writer.Write(functionOffset);
-        writer.Write(data.Texts1.Length);
+        writer.Write(data.Strings.Length);
         writer.Write(text1Offset);
         writer.Write(text2Offset);
         writer.Write(text3Offset);
@@ -128,22 +128,22 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
 
         var lastOffset = 8;
 
-        if (data.Texts1.Length > 0)
+        if (data.Strings.Length > 0)
         {
             WriteVariableInt(writer, text1Offset - lastOffset);
-            for (var i = 0; i < data.Texts1.Length - 1; i++)
+            for (var i = 0; i < data.Strings.Length - 1; i++)
                 writer.Write((byte)4);
 
-            lastOffset = text1Offset + data.Texts1.Length * 4 - 4;
+            lastOffset = text1Offset + data.Strings.Length * 4 - 4;
         }
 
-        if (data.Texts2.Length > 0)
+        if (data.ExportedLabels.Length > 0)
         {
             WriteVariableInt(writer, text2Offset - lastOffset);
-            for (var i = 0; i < data.Texts2.Length - 1; i++)
+            for (var i = 0; i < data.ExportedLabels.Length - 1; i++)
                 writer.Write((byte)4);
 
-            lastOffset = text2Offset + data.Texts2.Length * 4 - 4;
+            lastOffset = text2Offset + data.ExportedLabels.Length * 4 - 4;
         }
 
         if (data.Texts3.Length > 0)

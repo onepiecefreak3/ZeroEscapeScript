@@ -62,6 +62,8 @@ public enum SyntaxTokenKind
     FalseKeyword,
     BreakKeyword,
     ContinueKeyword,
+    ExportKeyword,
+    NameKeyword,
 
     EndOfFile
 }

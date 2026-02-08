@@ -80,8 +80,8 @@ internal class FsbReader : IFsbReader
         {
             Name = name,
             Functions = [.. functions],
-            Texts1 = [.. texts1],
-            Texts2 = [.. texts2],
+            Strings = [.. texts1],
+            ExportedLabels = [.. texts2],
             Texts3 = [.. texts3]
         };
     }

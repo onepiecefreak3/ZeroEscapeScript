@@ -68,6 +68,8 @@ internal class SpikeChunsoftSyntaxFactory : ISpikeChunsoftSyntaxFactory
             case SyntaxTokenKind.FalseKeyword: return new("false", (int)kind);
             case SyntaxTokenKind.BreakKeyword: return new("break", (int)kind);
             case SyntaxTokenKind.ContinueKeyword: return new("continue", (int)kind);
+            case SyntaxTokenKind.ExportKeyword: return new("export", (int)kind);
+            case SyntaxTokenKind.NameKeyword: return new("name", (int)kind);
             default: throw new InvalidOperationException($"Cannot create simple token from kind {kind}. Use other methods instead.");
         }
     }

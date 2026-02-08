@@ -5,5 +5,5 @@ namespace Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversi
 
 interface IFsbScriptFileConverter
 {
-    CodeUnitSyntax CreateCodeUnit(Sir0Function[] functions);
+    CodeUnitSyntax CreateCodeUnit(Sir0Script script);
 }

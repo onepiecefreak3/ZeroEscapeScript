@@ -18,8 +18,17 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
 
     private void ComposeCodeUnit(CodeUnitSyntax codeUnit, StringBuilder sb)
     {
+        ComposeNameDeclaration(codeUnit.NameDeclaration, sb);
+
         foreach (MethodDeclarationSyntax methodDeclaration in codeUnit.MethodDeclarations)
             ComposeMethodDeclaration(methodDeclaration, sb);
+    }
+
+    private void ComposeNameDeclaration(NameDeclarationSyntax nameDeclaration, StringBuilder sb)
+    {
+        ComposeSyntaxToken(nameDeclaration.NameToken, sb);
+        ComposeLiteralExpression(nameDeclaration.Name, sb);
+        ComposeSyntaxToken(nameDeclaration.Semicolon, sb);
     }
 
     private void ComposeMethodDeclaration(MethodDeclarationSyntax methodDeclaration, StringBuilder sb)
@@ -74,6 +83,10 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
 
             case PostfixStatementSyntax postfix:
                 ComposePostfixStatement(postfix, sb);
+                break;
+
+            case ExportedGotoLabelStatementSyntax exportGotoLabel:
+                ComposeExportedGotoLabelStatement(exportGotoLabel, sb);
                 break;
 
             case GotoLabelStatementSyntax gotoLabel:
@@ -150,6 +163,13 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         ComposePostfixExpression(postfix.Postfix, sb);
         ComposeSyntaxToken(postfix.Semicolon, sb);
+    }
+
+    private void ComposeExportedGotoLabelStatement(ExportedGotoLabelStatementSyntax exportGotoLabelStatement, StringBuilder sb)
+    {
+        ComposeSyntaxToken(exportGotoLabelStatement.Export, sb);
+        ComposeLiteralExpression(exportGotoLabelStatement.Label, sb);
+        ComposeSyntaxToken(exportGotoLabelStatement.Colon, sb);
     }
 
     private void ComposeGotoLabelStatement(GotoLabelStatementSyntax gotoLabelStatement, StringBuilder sb)

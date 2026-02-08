@@ -20,7 +20,7 @@ class ExtractFsbWorkflow(
         Sir0Script script = scriptParser.Parse(input);
 
         // Convert to readable script
-        CodeUnitSyntax codeUnit = scriptConverter.CreateCodeUnit(script.Functions);
+        CodeUnitSyntax codeUnit = scriptConverter.CreateCodeUnit(script);
         scriptNormalizer.NormalizeCodeUnit(codeUnit);
 
         string readableScript = scriptComposer.ComposeCodeUnit(codeUnit);
