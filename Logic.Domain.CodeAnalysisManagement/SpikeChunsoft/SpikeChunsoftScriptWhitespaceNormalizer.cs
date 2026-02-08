@@ -215,6 +215,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         ctx.Indent--;
         ctx.ShouldIndent = true;
         ctx.ShouldLineBreak = false;
+        ctx.IsFirstElement = true;
         NormalizeLiteralExpression(gotoLabelStatement.Label, ctx);
     }
 

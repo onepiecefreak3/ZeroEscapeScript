@@ -153,6 +153,12 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
                 case 0x30:
                     return CreateReturnStatement();
 
+                case 0x33:
+                    return CreateGotoStatement(operation);
+                
+                case 0x34:
+                    return CreateGotoLabelStatement(operation);
+
                 case 0x36:
                 case 0x37:
                     return null;
@@ -555,22 +561,31 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new PostfixStatementSyntax(postfix, semicolon);
     }
 
-    private GotoStatementSyntax CreateGotoStatement(string jumpLabel)
-    {
-        SyntaxToken gotoToken = _syntaxFactory.Token(SyntaxTokenKind.GotoKeyword);
-        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
-
-        var label = CreateStringLiteralExpression(jumpLabel);
-
-        return new GotoStatementSyntax(gotoToken, label, semicolon);
-    }
-
     private ReturnStatementSyntax CreateReturnStatement(ExpressionSyntax? expression = null)
     {
         SyntaxToken returnToken = _syntaxFactory.Token(SyntaxTokenKind.ReturnKeyword);
         SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new ReturnStatementSyntax(returnToken, expression, semicolon);
+    }
+
+    private GotoStatementSyntax CreateGotoStatement(Sir0Operation operation)
+    {
+        SyntaxToken gotoToken = _syntaxFactory.Token(SyntaxTokenKind.GotoKeyword);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        var label = CreateStringLiteralExpression((string)operation.Arguments[0]);
+
+        return new GotoStatementSyntax(gotoToken, label, semicolon);
+    }
+
+    private GotoLabelStatementSyntax CreateGotoLabelStatement(Sir0Operation operation)
+    {
+        SyntaxToken colon = _syntaxFactory.Token(SyntaxTokenKind.Colon);
+
+        var label = CreateStringLiteralExpression((string)operation.Arguments[0]);
+
+        return new GotoLabelStatementSyntax(label, colon);
     }
 
     private AsyncBlockStatement CreateAsyncBlockStatement(Sir0Operation[] operations, ref int index)
@@ -684,13 +699,6 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     private LiteralExpressionSyntax CreateStringLiteralExpression(string value)
     {
         return new LiteralExpressionSyntax(_syntaxFactory.StringLiteral(value));
-    }
-
-    private GotoLabelStatementSyntax CreateGotoLabelStatement(string jumpLabel)
-    {
-        var colon = _syntaxFactory.Token(SyntaxTokenKind.Colon);
-
-        return new GotoLabelStatementSyntax(CreateStringLiteralExpression(jumpLabel), colon);
     }
 
     private NameSyntax CreateName(string name)

@@ -83,10 +83,11 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             switch (statement)
             {
                 case GotoLabelStatementSyntax gotoLabelStatement:
-                    if (jumpLabel is not null)
-                        throw CreateException("Only one jump label is allowed per statement.", gotoLabelStatement.Location);
+                    AddOperations(operations, gotoLabelStatement, jumpLabel);
+                    break;
 
-                    nextLabel = GetStringLiteral(gotoLabelStatement.Label);
+                case GotoStatementSyntax gotoStatement:
+                    AddOperations(operations, gotoStatement, jumpLabel);
                     break;
 
                 case MethodInvocationStatementSyntax methodInvocation:
@@ -161,6 +162,16 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         }
 
         return jumpLabel;
+    }
+
+    private void AddOperations(List<Sir0Operation> operations, GotoLabelStatementSyntax gotoLabelStatement, string? jumpLabel)
+    {
+        AddGotoLabelOperation(operations, jumpLabel, GetStringLiteral(gotoLabelStatement.Label));
+    }
+
+    private void AddOperations(List<Sir0Operation> operations, GotoStatementSyntax gotoStatement, string? jumpLabel)
+    {
+        AddGotoOperation(operations, jumpLabel, GetStringLiteral(gotoStatement.Label));
     }
 
     private void AddOperations(List<Sir0Operation> operations, MethodInvocationStatementSyntax methodInvocation, string? jumpLabel)
@@ -532,7 +543,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             if (hasThenControl && hasElseControl)
             {
                 AddConditionalJumpOnTrue(operations, null, thenTargetLabel);
-                AddGotoOperation(operations, null, elseTargetLabel);
+                AddUnconditionalJump(operations, null, elseTargetLabel);
 
                 if (thenBreak || elseBreak)
                     _loopContextStack.Peek().BreakUsed = true;
@@ -567,7 +578,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         string? danglingThenLabel = CreateOperationsInternal(operations, ifElseStatement.Body, null);
 
         int gotoIndex = operations.Count;
-        AddGotoOperation(operations, danglingThenLabel, endLabel);
+        AddUnconditionalJump(operations, danglingThenLabel, endLabel);
 
         string? danglingElseLabel = CreateOperationsInternal(operations, ifElseStatement.ElseBody, elseLabel);
         if (danglingElseLabel is not null)
@@ -621,7 +632,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             if (hasThenControl && hasElseControl)
             {
                 AddConditionalJumpOnFalse(operations, null, thenTargetLabel);
-                AddGotoOperation(operations, null, elseTargetLabel);
+                AddUnconditionalJump(operations, null, elseTargetLabel);
 
                 if (thenBreak || elseBreak)
                     _loopContextStack.Peek().BreakUsed = true;
@@ -656,7 +667,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         string? danglingThenLabel = CreateOperationsInternal(operations, ifNotElseStatement.Body, null);
 
         int gotoIndex = operations.Count;
-        AddGotoOperation(operations, danglingThenLabel, endLabel);
+        AddUnconditionalJump(operations, danglingThenLabel, endLabel);
 
         string? danglingElseLabel = CreateOperationsInternal(operations, ifNotElseStatement.ElseBody, elseLabel);
         if (danglingElseLabel is not null)
@@ -692,14 +703,14 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             AddConditionalJumpOnTrue(operations, null, label);
         }
 
-        AddGotoOperation(operations, null, endLabel);
+        AddUnconditionalJump(operations, null, endLabel);
 
         foreach ((CaseStatementSyntax @case, string label) in cases)
         {
             bool endsWithBreak = @case.Statements.Count > 0 && @case.Statements[^1] is BreakStatementSyntax;
             string? danglingLabel = CreateOperationsInternal(operations, @case.Statements, label);
             if (!endsWithBreak)
-                AddGotoOperation(operations, danglingLabel, endLabel);
+                AddUnconditionalJump(operations, danglingLabel, endLabel);
         }
 
         _switchContextStack.Pop();
@@ -758,7 +769,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
         // HINT: "while (false)" is emitted as no additional operations
         if (doWhileStatement.Condition is LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.TrueKeyword })
-            AddGotoOperation(operations, danglingLabel, startLabel);
+            AddUnconditionalJump(operations, danglingLabel, startLabel);
         else if (doWhileStatement.Condition is not LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.FalseKeyword })
             AddConditionalJumpOnTrue(operations, danglingLabel, startLabel);
 
@@ -778,7 +789,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
         // HINT: "while not (true)" is emitted as no additional operations
         if (doWhileNotStatement.Condition is LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.FalseKeyword })
-            AddGotoOperation(operations, danglingLabel, startLabel);
+            AddUnconditionalJump(operations, danglingLabel, startLabel);
         else if (doWhileNotStatement.Condition is not LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.TrueKeyword })
             AddConditionalJumpOnFalse(operations, danglingLabel, startLabel);
 
@@ -791,7 +802,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
     {
         if (_switchContextStack.Count > 0)
         {
-            AddGotoOperation(operations, jumpLabel, _switchContextStack.Peek().EndLabel);
+            AddUnconditionalJump(operations, jumpLabel, _switchContextStack.Peek().EndLabel);
             return null;
         }
 
@@ -799,7 +810,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             throw new InvalidOperationException("Break statement is only valid within a loop.");
 
         LoopEmissionContext loopContext = _loopContextStack.Peek();
-        AddGotoOperation(operations, jumpLabel, loopContext.BreakLabel);
+        AddUnconditionalJump(operations, jumpLabel, loopContext.BreakLabel);
         loopContext.BreakUsed = true;
 
         return null;
@@ -811,7 +822,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
             throw new InvalidOperationException("Continue statement is only valid within a loop.");
 
         LoopEmissionContext loopContext = _loopContextStack.Peek();
-        AddGotoOperation(operations, jumpLabel, loopContext.StartLabel);
+        AddUnconditionalJump(operations, jumpLabel, loopContext.StartLabel);
 
         return null;
     }
@@ -870,6 +881,16 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
     }
 
     private static void AddGotoOperation(List<Sir0Operation> operations, string? jumpLabel, string targetLabel)
+    {
+        operations.Add(new Sir0Operation(jumpLabel, 0x33, [targetLabel]));
+    }
+
+    private static void AddGotoLabelOperation(List<Sir0Operation> operations, string? jumpLabel, string targetLabel)
+    {
+        operations.Add(new Sir0Operation(jumpLabel, 0x34, [targetLabel]));
+    }
+
+    private static void AddUnconditionalJump(List<Sir0Operation> operations, string? jumpLabel, string targetLabel)
     {
         operations.Add(new Sir0Operation(jumpLabel, 0x35, [targetLabel]));
     }

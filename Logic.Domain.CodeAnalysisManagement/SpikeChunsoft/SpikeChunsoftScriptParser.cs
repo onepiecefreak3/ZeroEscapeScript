@@ -127,7 +127,8 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private bool IsStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
+        return HasTokenKind(buffer, SyntaxTokenKind.GotoKeyword) ||
+               HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) ||
                HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.AsyncKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.SwitchKeyword) ||
@@ -169,6 +170,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (IsMethodInvocation(buffer))
             return ParseMethodInvocationStatement(buffer);
 
+        if (HasTokenKind(buffer, SyntaxTokenKind.GotoKeyword))
+            return ParseGotoStatement(buffer);
+
         if (HasTokenKind(buffer, SyntaxTokenKind.ReturnKeyword))
             return ParseReturnStatement(buffer);
 
@@ -199,11 +203,6 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return HasTokenKind(buffer, SyntaxTokenKind.Equals) ||
                 HasTokenKind(buffer, SyntaxTokenKind.PlusEquals) ||
                 HasTokenKind(buffer, SyntaxTokenKind.MinusEquals);
-    }
-
-    private bool IsNativeMethodInvocationStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
-    {
-        return HasTokenKind(buffer, 1, SyntaxTokenKind.ParenOpen);
     }
 
     private bool IsPostfixStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -269,6 +268,15 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         SyntaxToken colon = ParseColonToken(buffer);
 
         return new GotoLabelStatementSyntax(identifier, colon);
+    }
+
+    private GotoStatementSyntax ParseGotoStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        SyntaxToken gotoToken = ParseGotoKeyword(buffer);
+        LiteralExpressionSyntax identifier = ParseStringLiteralExpression(buffer);
+        SyntaxToken semicolon = ParseSemicolonToken(buffer);
+
+        return new GotoStatementSyntax(gotoToken, identifier, semicolon);
     }
 
     private AsyncBlockStatement ParseAsyncBlockStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -1126,6 +1134,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseOrKeywordToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.OrKeyword);
+    }
+
+    private SyntaxToken ParseGotoKeyword(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.GotoKeyword);
     }
 
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)
