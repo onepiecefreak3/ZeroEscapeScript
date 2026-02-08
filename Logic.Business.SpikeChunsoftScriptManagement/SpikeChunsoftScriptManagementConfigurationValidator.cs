@@ -18,7 +18,7 @@ internal class SpikeChunsoftScriptManagementConfigurationValidator : ISpikeChuns
         if (string.IsNullOrWhiteSpace(config.Operation))
             throw new InvalidOperationException("No operation mode was given. Specify an operation mode by using the -o argument.");
 
-        if (config.Operation != "e" && config.Operation != "c")
+        if (config.Operation != "e" && config.Operation != "c" && config.Operation != "p")
             throw new InvalidOperationException($"The operation mode '{config.Operation}' is not valid. Use -h to see a list of valid operation modes.");
     }
 

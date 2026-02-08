@@ -2,6 +2,7 @@
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Creation;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Extraction;
+using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Purification;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement;
 
@@ -9,7 +10,8 @@ internal class ScriptManagementWorkflow(
     SpikeChunsoftScriptManagementConfiguration config,
     ISpikeChunsoftScriptManagementConfigurationValidator configValidator,
     IExtractWorkflow extractWorkflow,
-    ICreateWorkflow createWorkflow)
+    ICreateWorkflow createWorkflow,
+    IPurifyWorkflow purifyWorkflow)
     : IScriptManagementWorkflow
 {
     public int Execute()
@@ -34,6 +36,10 @@ internal class ScriptManagementWorkflow(
 
             case "c":
                 createWorkflow.Create();
+                break;
+
+            case "p":
+                purifyWorkflow.Purify();
                 break;
         }
 

@@ -11,6 +11,8 @@ using Logic.Business.SpikeChunsoftScriptManagement.InternalContract;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Conversion;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Creation;
 using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Extraction;
+using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Purification;
+using Logic.Business.SpikeChunsoftScriptManagement.Purification;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement;
 
@@ -41,6 +43,9 @@ public class SpikeChunsoftScriptManagementActivator : IComponentActivator
 
         kernel.Register<ICreateWorkflow, CreateWorkflow>(ActivationScope.Unique);
         kernel.Register<ICreateFsbWorkflow, CreateFsbWorkflow>(ActivationScope.Unique);
+
+        kernel.Register<IPurifyWorkflow, PurifyWorkflow>(ActivationScope.Unique);
+        kernel.Register<IPurifyFsbWorkflow, PurifyFsbWorkflow>(ActivationScope.Unique);
 
         kernel.Register<IFsbScriptFileConverter, FsbScriptFileConverter>(ActivationScope.Unique);
         kernel.Register<IFsbCodeUnitConverter, FsbCodeUnitConverter>(ActivationScope.Unique);
