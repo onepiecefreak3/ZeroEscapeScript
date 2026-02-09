@@ -690,8 +690,16 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         switch (expression)
         {
-            case MemberAccessExpressionSyntax memberAccess:
-                NormalizeMemberAccessExpression(memberAccess, ctx);
+            case SimpleMemberAccessExpressionSyntax memberAccess:
+                NormalizeSimpleMemberAccessExpression(memberAccess, ctx);
+                break;
+
+            case QualifiedMemberAccessExpressionSyntax memberAccess:
+                NormalizeQualifiedMemberAccessExpression(memberAccess, ctx);
+                break;
+
+            case CompoundMemberAccessExpressionSyntax memberAccess:
+                NormalizeCompoundMemberAccessExpression(memberAccess, ctx);
                 break;
 
             case ParenthesizedExpressionSyntax parens:
@@ -732,7 +740,33 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         }
     }
 
-    private void NormalizeMemberAccessExpression(MemberAccessExpressionSyntax memberAccess, WhitespaceNormalizeContext ctx)
+    private void NormalizeSimpleMemberAccessExpression(SimpleMemberAccessExpressionSyntax memberAccess, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken identifier = memberAccess.Identifier.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(null);
+
+        memberAccess.SetIdentifier(identifier, false);
+    }
+
+    private void NormalizeQualifiedMemberAccessExpression(QualifiedMemberAccessExpressionSyntax memberAccess, WhitespaceNormalizeContext ctx)
+    {
+        string? leadingTrivia = null;
+        if (ctx is { ShouldIndent: true, Indent: > 0 })
+            leadingTrivia = new string('\t', ctx.Indent);
+
+        SyntaxToken nameSpace = memberAccess.NameSpace.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(null);
+        SyntaxToken operatorToken = memberAccess.Operator.WithNoTrivia();
+        SyntaxToken identifier = memberAccess.Identifier.WithNoTrivia();
+
+        memberAccess.SetNameSpace(nameSpace, false);
+        memberAccess.SetOperator(operatorToken, false);
+        memberAccess.SetIdentifier(identifier, false);
+    }
+
+    private void NormalizeCompoundMemberAccessExpression(CompoundMemberAccessExpressionSyntax memberAccess, WhitespaceNormalizeContext ctx)
     {
         SyntaxToken operatorToken = memberAccess.Operator.WithNoTrivia();
         SyntaxToken identifier = memberAccess.Identifier.WithNoTrivia();

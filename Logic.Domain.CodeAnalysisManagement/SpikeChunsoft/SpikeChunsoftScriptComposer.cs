@@ -343,8 +343,16 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         switch (expression)
         {
-            case MemberAccessExpressionSyntax memberAccess:
-                ComposeMemberAccessExpression(memberAccess, sb);
+            case SimpleMemberAccessExpressionSyntax memberAccess:
+                ComposeSimpleMemberAccessExpression(memberAccess, sb);
+                break;
+
+            case QualifiedMemberAccessExpressionSyntax memberAccess:
+                ComposeQualifiedMemberAccessExpression(memberAccess, sb);
+                break;
+
+            case CompoundMemberAccessExpressionSyntax memberAccess:
+                ComposeCompoundMemberAccessExpression(memberAccess, sb);
                 break;
 
             case ParenthesizedExpressionSyntax parens:
@@ -386,9 +394,21 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         }
     }
 
-    private void ComposeMemberAccessExpression(MemberAccessExpressionSyntax memberAccess, StringBuilder sb)
+    private void ComposeSimpleMemberAccessExpression(SimpleMemberAccessExpressionSyntax memberAccess, StringBuilder sb)
     {
-        ComposeExpression(memberAccess.Eval, sb);
+        ComposeSyntaxToken(memberAccess.Identifier, sb);
+    }
+
+    private void ComposeQualifiedMemberAccessExpression(QualifiedMemberAccessExpressionSyntax memberAccess, StringBuilder sb)
+    {
+        ComposeSyntaxToken(memberAccess.NameSpace, sb);
+        ComposeSyntaxToken(memberAccess.Operator, sb);
+        ComposeSyntaxToken(memberAccess.Identifier, sb);
+    }
+
+    private void ComposeCompoundMemberAccessExpression(CompoundMemberAccessExpressionSyntax memberAccess, StringBuilder sb)
+    {
+        ComposeParenthesizedExpression(memberAccess.Eval, sb);
         ComposeSyntaxToken(memberAccess.Operator, sb);
         ComposeSyntaxToken(memberAccess.Identifier, sb);
     }

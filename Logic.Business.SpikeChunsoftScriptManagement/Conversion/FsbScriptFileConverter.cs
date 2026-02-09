@@ -245,11 +245,11 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
                 if (operation.Arguments[0] is not "?_eval_")
                 {
-                    expression = CreateStringLiteralExpression((string)operation.Arguments[0] + "::" + (string)operation.Arguments[1]);
+                    expression = CreateQualifiedMemberAccessExpression((string)operation.Arguments[0], (string)operation.Arguments[1]);
                     break;
                 }
 
-                expression = CreateMemberAccessExpression(expressionStack, (string)operation.Arguments[1]);
+                expression = CreateCompoundMemberAccessExpression(expressionStack, (string)operation.Arguments[1]);
                 break;
 
             case 0x20:
@@ -542,19 +542,41 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     {
         ExpressionSyntax nameExpression = syntax.Pop();
 
-        if (nameExpression is not MemberAccessExpressionSyntax && (nameExpression is not LiteralExpressionSyntax literal || literal.Literal.RawKind != (int)SyntaxTokenKind.StringLiteral))
+        if (nameExpression is LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.StringLiteral } literal)
+            nameExpression = CreateSimpleMemberAccessExpression(literal.Literal.Text[1..^1]);
+
+        if (nameExpression is not MemberAccessExpressionSyntax)
             throw new InvalidOperationException("Need method name for invocation.");
 
         return new NativeMethodInvocationExpressionSyntax(nameExpression, CreateNativeMethodInvocationParameters([.. args.Reverse()]));
     }
 
-    private MemberAccessExpressionSyntax CreateMemberAccessExpression(Stack<ExpressionSyntax> syntax, string name)
+    private SimpleMemberAccessExpressionSyntax CreateSimpleMemberAccessExpression(string name)
+    {
+        SyntaxToken identifier = _syntaxFactory.Identifier(name);
+
+        return new SimpleMemberAccessExpressionSyntax(identifier);
+    }
+
+    private CompoundMemberAccessExpressionSyntax CreateCompoundMemberAccessExpression(Stack<ExpressionSyntax> syntax, string name)
     {
         var left = CreateParenthesizedExpression(syntax.Pop());
         SyntaxToken operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ColonColon);
         SyntaxToken identifier = _syntaxFactory.Identifier(name);
 
-        return new MemberAccessExpressionSyntax(left, operatorToken, identifier);
+        return new CompoundMemberAccessExpressionSyntax(left, operatorToken, identifier);
+    }
+
+    private QualifiedMemberAccessExpressionSyntax CreateQualifiedMemberAccessExpression(string nameSpace, string name)
+    {
+        if (nameSpace[0] is '?')
+            nameSpace = nameSpace[1..];
+
+        SyntaxToken nameSpaceIdentifier = _syntaxFactory.Identifier(nameSpace);
+        SyntaxToken operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ColonColon);
+        SyntaxToken identifier = _syntaxFactory.Identifier(name);
+
+        return new QualifiedMemberAccessExpressionSyntax(nameSpaceIdentifier, operatorToken, identifier);
     }
 
     private AssignmentStatementSyntax CreateAssignmentStatement(AssignmentExpressionSyntax assignment)

@@ -148,12 +148,14 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
                HasTokenKind(buffer, SyntaxTokenKind.BreakKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.ContinueKeyword) ||
                HasTokenKind(buffer, SyntaxTokenKind.ParenOpen) ||
+               HasTokenKind(buffer, SyntaxTokenKind.Identifier) ||
                IsMethodInvocation(buffer);
     }
 
     private bool IsMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return HasTokenKind(buffer, SyntaxTokenKind.Identifier) &&
+               ContainsTokenText(buffer, "sub") &&
                HasTokenKind(buffer, 1, SyntaxTokenKind.ParenOpen);
     }
 
@@ -175,7 +177,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
             if (IsAssignmentStatement(buffer))
                 return ParseAssignmentStatement(buffer, left);
 
-            if (left is NativeMethodInvocationExpressionSyntax invocation && HasTokenKind(buffer, SyntaxTokenKind.Semicolon))
+            if (left is NativeMethodInvocationExpressionSyntax invocation)
                 return ParseNativeMethodInvocationStatement(buffer, invocation);
 
             throw CreateException(buffer, "Unknown statement.", SyntaxTokenKind.Plus, SyntaxTokenKind.PlusEquals, SyntaxTokenKind.MinusEquals);
@@ -183,6 +185,14 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         if (IsMethodInvocation(buffer))
             return ParseMethodInvocationStatement(buffer);
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Identifier))
+        {
+            var left = ParseAtomicExpression(buffer);
+
+            if (left is NativeMethodInvocationExpressionSyntax invocation)
+                return ParseNativeMethodInvocationStatement(buffer, invocation);
+        }
 
         if (HasTokenKind(buffer, SyntaxTokenKind.GotoKeyword))
             return ParseGotoStatement(buffer);
@@ -712,7 +722,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
             if (HasTokenKind(buffer, SyntaxTokenKind.ColonColon))
             {
-                ExpressionSyntax left = ParseMemberAccessExpression(buffer, eval);
+                ExpressionSyntax left = ParseCompoundMemberAccessExpression(buffer, eval);
 
                 if (HasTokenKind(buffer, SyntaxTokenKind.ParenOpen))
                     return ParseNativeMethodInvocationExpression(buffer, left);
@@ -724,7 +734,16 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         }
 
         if (IsNativeMethodInvocation(buffer))
-            return ParseNativeMethodInvocationExpression(buffer);
+        {
+            LiteralExpressionSyntax name = ParseLiteralExpression(buffer);
+            return ParseNativeMethodInvocationExpression(buffer, name);
+        }
+
+        if (HasTokenKind(buffer, SyntaxTokenKind.Identifier))
+        {
+            MemberAccessExpressionSyntax left = ParseIdentifierMemberAccessExpression(buffer);
+            return ParseNativeMethodInvocationExpression(buffer, left);
+        }
 
         if (IsLiteralExpression(buffer))
         {
@@ -740,12 +759,25 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
             SyntaxTokenKind.NumericLiteral, SyntaxTokenKind.ParenOpen);
     }
 
-    private MemberAccessExpressionSyntax ParseMemberAccessExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer, ParenthesizedExpressionSyntax eval)
+    private MemberAccessExpressionSyntax ParseIdentifierMemberAccessExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var identifier = ParseIdentifierToken(buffer);
+
+        if (!HasTokenKind(buffer, SyntaxTokenKind.ColonColon))
+            return new SimpleMemberAccessExpressionSyntax(identifier);
+
+        var operatorToken = ParseColonColonToken(buffer);
+        var name = ParseIdentifierToken(buffer);
+
+        return new QualifiedMemberAccessExpressionSyntax(identifier, operatorToken, name);
+    }
+
+    private CompoundMemberAccessExpressionSyntax ParseCompoundMemberAccessExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer, ParenthesizedExpressionSyntax eval)
     {
         var operatorToken = ParseColonColonToken(buffer);
         var identifier = ParseIdentifierToken(buffer);
 
-        return new MemberAccessExpressionSyntax(eval, operatorToken, identifier);
+        return new CompoundMemberAccessExpressionSyntax(eval, operatorToken, identifier);
     }
 
     private bool IsNativeMethodInvocation(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -768,13 +800,6 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
                 SyntaxTokenKind.MinusEquals);
 
         return new AssignmentExpressionSyntax(left, operatorToken, ParseExpression(buffer));
-    }
-
-    private NativeMethodInvocationExpressionSyntax ParseNativeMethodInvocationExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer)
-    {
-        LiteralExpressionSyntax name = ParseLiteralExpression(buffer);
-
-        return ParseNativeMethodInvocationExpression(buffer, name);
     }
 
     private NativeMethodInvocationExpressionSyntax ParseNativeMethodInvocationExpression(IBuffer<SpikeChunsoftSyntaxToken> buffer, ExpressionSyntax name)
@@ -1252,6 +1277,27 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
         for (var i = 0; i < toSkip; i++)
             buffer.Read();
+    }
+
+    protected bool ContainsTokenText(IBuffer<SpikeChunsoftSyntaxToken> buffer, string text)
+    {
+        return ContainsTokenText(buffer, 0, text);
+    }
+
+    protected bool ContainsTokenText(IBuffer<SpikeChunsoftSyntaxToken> buffer, int position, string text)
+    {
+        var toPeek = 0;
+        SpikeChunsoftSyntaxToken peekedToken = buffer.Peek(toPeek);
+
+        position = Math.Max(0, position);
+        for (var i = 0; i < position + 1; i++)
+        {
+            peekedToken = buffer.Peek(toPeek++);
+            if (peekedToken.Kind == SyntaxTokenKind.Trivia)
+                peekedToken = buffer.Peek(toPeek++);
+        }
+
+        return peekedToken.Text?.Contains(text) ?? false;
     }
 
     protected bool HasTokenKind(IBuffer<SpikeChunsoftSyntaxToken> buffer, SyntaxTokenKind expectedKind)

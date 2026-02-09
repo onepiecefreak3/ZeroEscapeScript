@@ -265,8 +265,16 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                 AddAssignmentExpression(operations, assignment, jumpLabel);
                 break;
 
-            case MemberAccessExpressionSyntax memberAccess:
-                AddMemberAccessExpression(operations, memberAccess, jumpLabel);
+            case SimpleMemberAccessExpressionSyntax memberAccess:
+                AddSimpleMemberAccessExpression(operations, memberAccess, jumpLabel);
+                break;
+
+            case QualifiedMemberAccessExpressionSyntax memberAccess:
+                AddQualifiedMemberAccessExpression(operations, memberAccess, jumpLabel);
+                break;
+
+            case CompoundMemberAccessExpressionSyntax memberAccess:
+                AddCompoundMemberAccessExpression(operations, memberAccess, jumpLabel);
                 break;
 
             case NativeMethodInvocationExpressionSyntax invocation:
@@ -478,10 +486,20 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         }
     }
 
-    private void AddMemberAccessExpression(List<Sir0Operation> operations, MemberAccessExpressionSyntax memberAccess, string? jumpLabel)
+    private void AddSimpleMemberAccessExpression(List<Sir0Operation> operations, SimpleMemberAccessExpressionSyntax memberAccess, string? jumpLabel)
+    {
+        AddStringLiteralOperation(operations, "?" + memberAccess.Identifier.Text, jumpLabel);
+    }
+
+    private void AddQualifiedMemberAccessExpression(List<Sir0Operation> operations, QualifiedMemberAccessExpressionSyntax memberAccess, string? jumpLabel)
+    {
+        AddStringLiteralOperation(operations, "?" + memberAccess.NameSpace.Text, memberAccess.Identifier.Text, jumpLabel);
+    }
+
+    private void AddCompoundMemberAccessExpression(List<Sir0Operation> operations, CompoundMemberAccessExpressionSyntax memberAccess, string? jumpLabel)
     {
         AddExpressionOperations(operations, memberAccess.Eval, jumpLabel);
-        AddStringLiteralOperation(operations, $"?_eval_::{memberAccess.Identifier.Text}", jumpLabel);
+        AddStringLiteralOperation(operations, "?_eval_", memberAccess.Identifier.Text, null);
     }
 
     private void AddNativeMethodInvocation(List<Sir0Operation> operations, NativeMethodInvocationExpressionSyntax expression, string? jumpLabel)
@@ -504,8 +522,12 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                 AddLiteralExpression(operations, literal, jumpLabel);
                 break;
 
-            case MemberAccessExpressionSyntax memberAccess:
-                AddMemberAccessExpression(operations, memberAccess, jumpLabel);
+            case QualifiedMemberAccessExpressionSyntax memberAccess:
+                AddQualifiedMemberAccessExpression(operations, memberAccess, jumpLabel);
+                break;
+
+            case CompoundMemberAccessExpressionSyntax memberAccess:
+                AddCompoundMemberAccessExpression(operations, memberAccess, jumpLabel);
                 break;
 
             default:
@@ -858,6 +880,17 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
     private static void AddNumericLiteralOperation(List<Sir0Operation> operations, float number, string? jumpLabel)
     {
         operations.Add(new Sir0Operation(jumpLabel, 0xF0, [number]));
+    }
+
+    private static void AddStringLiteralOperation(List<Sir0Operation> operations, string text1, string text2, string? jumpLabel)
+    {
+        if (text1[0] is '?' or '@' or ':' or '~' or '^' or '$' or '&')
+        {
+            operations.Add(new Sir0Operation(jumpLabel, 0xF4, [text1, text2]));
+            return;
+        }
+
+        operations.Add(new Sir0Operation(jumpLabel, 0xF1, [text1]));
     }
 
     private static void AddStringLiteralOperation(List<Sir0Operation> operations, string text, string? jumpLabel)
