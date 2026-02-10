@@ -1,6 +1,6 @@
 ﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft
 {
-    public class NameDeclarationSyntax : SyntaxNode
+    public class NameDeclarationSyntax : DeclarationSyntax
     {
         public SyntaxToken NameToken { get; private set; }
         public LiteralExpressionSyntax Name { get; private set; }

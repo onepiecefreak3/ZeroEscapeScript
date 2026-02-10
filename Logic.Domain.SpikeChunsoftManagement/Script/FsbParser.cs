@@ -16,7 +16,7 @@ internal class FsbParser(IFsbReader reader) : IFsbParser
             Name = scriptData.Name,
             Functions = functions,
             ExportedLabels = scriptData.ExportedLabels,
-            Texts3 = scriptData.Texts3
+            GlobalVariables = scriptData.GlobalVariables
         };
     }
 

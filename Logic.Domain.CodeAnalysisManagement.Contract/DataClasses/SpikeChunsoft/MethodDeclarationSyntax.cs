@@ -1,6 +1,6 @@
 ﻿namespace Logic.Domain.CodeAnalysisManagement.Contract.DataClasses.SpikeChunsoft;
 
-public class MethodDeclarationSyntax : SyntaxNode
+public class MethodDeclarationSyntax : DeclarationSyntax
 {
     public LiteralExpressionSyntax Name { get; private set; }
     public MethodDeclarationParametersSyntax Parameters { get; private set; }

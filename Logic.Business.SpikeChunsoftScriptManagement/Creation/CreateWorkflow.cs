@@ -1,14 +1,11 @@
 ﻿using Logic.Business.SpikeChunsoftScriptManagement.InternalContract.Creation;
-using Logic.Domain.SpikeChunsoftManagement.Contract.Script;
 using System.Diagnostics.CodeAnalysis;
-using Logic.Domain.SpikeChunsoftManagement.Contract.DataClasses.Script;
 
 namespace Logic.Business.SpikeChunsoftScriptManagement.Creation;
 
 class CreateWorkflow(
     SpikeChunsoftScriptManagementConfiguration config,
-    ICreateFsbWorkflow createFsbWorkflow,
-    IFsbParser scriptParser)
+    ICreateFsbWorkflow createFsbWorkflow)
     : ICreateWorkflow
 {
     public void Create()
@@ -46,15 +43,12 @@ class CreateWorkflow(
     {
         error = null;
 
-        using Stream donorStream = File.OpenRead(GetDonorPath(filePath));
-        Sir0Script donorScript = scriptParser.Parse(donorStream);
-
         using Stream inputStream = File.OpenRead(filePath);
 
         try
         {
             using Stream outputStream = File.Create(filePath + ".fsb");
-            createFsbWorkflow.Create(inputStream, outputStream, donorScript);
+            createFsbWorkflow.Create(inputStream, outputStream);
         }
         catch (Exception e)
         {
@@ -63,12 +57,6 @@ class CreateWorkflow(
         }
 
         return true;
-    }
-
-    private static string GetDonorPath(string filePath)
-    {
-        string? directory = Path.GetDirectoryName(filePath);
-        return Path.Combine(directory!, Path.GetFileNameWithoutExtension(filePath));
     }
 
     private static Exception GetInnermostException(Exception e)

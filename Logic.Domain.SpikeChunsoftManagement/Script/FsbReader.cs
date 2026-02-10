@@ -82,7 +82,7 @@ internal class FsbReader : IFsbReader
             Functions = [.. functions],
             Strings = [.. texts1],
             ExportedLabels = [.. texts2],
-            Texts3 = [.. texts3]
+            GlobalVariables = [.. texts3]
         };
     }
 

@@ -3,19 +3,19 @@
 public class CodeUnitSyntax : SyntaxNode
 {
     public NameDeclarationSyntax NameDeclaration { get; private set; }
-    public IReadOnlyList<MethodDeclarationSyntax> MethodDeclarations { get; private set; }
+    public IReadOnlyList<DeclarationSyntax> Members { get; private set; }
 
     public override SyntaxLocation Location => NameDeclaration.Location;
     public override SyntaxSpan Span => new(NameDeclaration.Span.Position,
-        MethodDeclarations.Count > 0 ? MethodDeclarations[^1].Span.EndPosition : NameDeclaration.Span.EndPosition);
+        Members.Count > 0 ? Members[^1].Span.EndPosition : NameDeclaration.Span.EndPosition);
 
-    public CodeUnitSyntax(NameDeclarationSyntax nameDeclaration, IReadOnlyList<MethodDeclarationSyntax>? methodDeclarations)
+    public CodeUnitSyntax(NameDeclarationSyntax nameDeclaration, IReadOnlyList<DeclarationSyntax>? members)
     {
         NameDeclaration = nameDeclaration;
-        MethodDeclarations = methodDeclarations ?? new List<MethodDeclarationSyntax>();
+        Members = members ?? new List<DeclarationSyntax>();
 
         nameDeclaration.Parent = this;
-        foreach (MethodDeclarationSyntax methodDeclaration in MethodDeclarations)
+        foreach (DeclarationSyntax methodDeclaration in Members)
             methodDeclaration.Parent = this;
 
         Root.Update();
@@ -30,11 +30,11 @@ public class CodeUnitSyntax : SyntaxNode
             Root.Update();
     }
 
-    public void SetMethodDeclarations(IReadOnlyList<MethodDeclarationSyntax>? methodDeclarations, bool updatePosition = true)
+    public void SetMembers(IReadOnlyList<DeclarationSyntax>? members, bool updatePosition = true)
     {
-        MethodDeclarations = methodDeclarations ?? new List<MethodDeclarationSyntax>();
+        Members = members ?? new List<DeclarationSyntax>();
         
-        foreach (MethodDeclarationSyntax methodDeclaration in MethodDeclarations)
+        foreach (DeclarationSyntax methodDeclaration in Members)
             methodDeclaration.Parent = this;
 
         if (updatePosition)
@@ -45,8 +45,8 @@ public class CodeUnitSyntax : SyntaxNode
     {
         position = NameDeclaration.UpdatePosition(position, ref line, ref column);
 
-        foreach (MethodDeclarationSyntax methodDeclaration in MethodDeclarations)
-            position = methodDeclaration.UpdatePosition(position, ref line, ref column);
+        foreach (DeclarationSyntax member in Members)
+            position = member.UpdatePosition(position, ref line, ref column);
 
         return position;
     }

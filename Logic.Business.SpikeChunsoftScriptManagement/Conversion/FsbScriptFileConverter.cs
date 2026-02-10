@@ -70,7 +70,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     public CodeUnitSyntax CreateCodeUnit(Sir0Script script)
     {
         NameDeclarationSyntax name = CreateNameDeclaration(script);
-        IReadOnlyList<MethodDeclarationSyntax> methods = CreateMethodDeclarations(script);
+        IReadOnlyList<DeclarationSyntax> methods = CreateMembers(script);
 
         return new CodeUnitSyntax(name, methods);
     }
@@ -84,14 +84,26 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         return new NameDeclarationSyntax(nameToken, nameLiteral, semicolon);
     }
 
-    private IReadOnlyList<MethodDeclarationSyntax> CreateMethodDeclarations(Sir0Script script)
+    private IReadOnlyList<DeclarationSyntax> CreateMembers(Sir0Script script)
     {
-        var result = new List<MethodDeclarationSyntax>(script.Functions.Length);
+        var result = new List<DeclarationSyntax>(script.Functions.Length);
+
+        foreach (string globalVariable in script.GlobalVariables)
+            result.Add(CreateGlobalVariableDeclaration(globalVariable));
 
         foreach (Sir0Function function in script.Functions)
             result.Add(CreateMethodDeclaration(function, script.ExportedLabels));
 
         return [.. result];
+    }
+
+    private GlobalVariableDeclarationSyntax CreateGlobalVariableDeclaration(string variableName)
+    {
+        SyntaxToken global = _syntaxFactory.Token(SyntaxTokenKind.GlobalKeyword);
+        SyntaxToken identifier = _syntaxFactory.Identifier(variableName);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new GlobalVariableDeclarationSyntax(global, identifier, semicolon);
     }
 
     private MethodDeclarationSyntax CreateMethodDeclaration(Sir0Function function, string[] exportedLabels)

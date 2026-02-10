@@ -16,20 +16,39 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
     private readonly Stack<LoopEmissionContext> _loopContextStack = new();
     private readonly Stack<SwitchEmissionContext> _switchContextStack = new();
 
-    public Sir0Function[] CreateScriptFile(CodeUnitSyntax tree, HashSet<string> exportedLabels, out string name)
+    public Sir0Script CreateScriptFile(CodeUnitSyntax tree)
     {
-        name = GetStringLiteral(tree.NameDeclaration.Name);
-        Sir0Function[] functions = CreateFunctions(tree.MethodDeclarations, exportedLabels);
+        HashSet<string> exportedLabels = [];
 
-        return functions;
+        string name = GetStringLiteral(tree.NameDeclaration.Name);
+        string[] variables = CreateGlobalVariables(tree.Members);
+        Sir0Function[] functions = CreateFunctions(tree.Members, exportedLabels);
+
+        return new Sir0Script
+        {
+            Name = name,
+            Functions = functions,
+            ExportedLabels = [.. exportedLabels],
+            GlobalVariables = variables
+        };
     }
 
-    private Sir0Function[] CreateFunctions(IReadOnlyList<MethodDeclarationSyntax> methods, HashSet<string> exportedLabels)
+    private string[] CreateGlobalVariables(IReadOnlyList<DeclarationSyntax> members)
+    {
+        var variables = new List<string>();
+
+        foreach (GlobalVariableDeclarationSyntax member in members.Where(m => m is GlobalVariableDeclarationSyntax).Cast<GlobalVariableDeclarationSyntax>())
+            variables.Add(member.Identifier.Text);
+
+        return [.. variables];
+    }
+
+    private Sir0Function[] CreateFunctions(IReadOnlyList<DeclarationSyntax> members, HashSet<string> exportedLabels)
     {
         var functions = new List<Sir0Function>();
 
-        foreach (MethodDeclarationSyntax method in methods)
-            functions.Add(CreateFunction(method, exportedLabels));
+        foreach (MethodDeclarationSyntax member in members.Where(m => m is MethodDeclarationSyntax).Cast<MethodDeclarationSyntax>())
+            functions.Add(CreateFunction(member, exportedLabels));
 
         return [.. functions];
     }

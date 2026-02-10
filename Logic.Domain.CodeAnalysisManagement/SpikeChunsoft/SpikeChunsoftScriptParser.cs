@@ -50,9 +50,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private CodeUnitSyntax ParseCodeUnit(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         var nameDeclaration = ParseNameDeclaration(buffer);
-        var methodDeclarations = ParseMethodDeclarations(buffer);
+        var members = ParseMembers(buffer);
 
-        return new CodeUnitSyntax(nameDeclaration, methodDeclarations);
+        return new CodeUnitSyntax(nameDeclaration, members);
     }
 
     private NameDeclarationSyntax ParseNameDeclaration(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -64,14 +64,28 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return new NameDeclarationSyntax(nameKeyword, literal, semicolon);
     }
 
-    private IReadOnlyList<MethodDeclarationSyntax> ParseMethodDeclarations(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    private IReadOnlyList<DeclarationSyntax> ParseMembers(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        var result = new List<MethodDeclarationSyntax>();
+        var result = new List<DeclarationSyntax>();
 
         while (buffer.Peek().Kind != SyntaxTokenKind.EndOfFile)
-            result.Add(ParseMethodDeclaration(buffer));
+        {
+            if (HasTokenKind(buffer, SyntaxTokenKind.GlobalKeyword))
+                result.Add(ParseGlobalVariableDeclaration(buffer));
+            else
+                result.Add(ParseMethodDeclaration(buffer));
+        }
 
         return result;
+    }
+
+    private GlobalVariableDeclarationSyntax ParseGlobalVariableDeclaration(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        var global = ParseGlobalKeyword(buffer);
+        var identifier = ParseIdentifierToken(buffer);
+        var semicolon = ParseSemicolonToken(buffer);
+
+        return new GlobalVariableDeclarationSyntax(global, identifier, semicolon);
     }
 
     private MethodDeclarationSyntax ParseMethodDeclaration(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -1204,6 +1218,11 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private SyntaxToken ParseNameKeyword(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         return CreateToken(buffer, SyntaxTokenKind.NameKeyword);
+    }
+
+    private SyntaxToken ParseGlobalKeyword(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    {
+        return CreateToken(buffer, SyntaxTokenKind.GlobalKeyword);
     }
 
     private SyntaxToken ParseNumericLiteralToken(IBuffer<SpikeChunsoftSyntaxToken> buffer)

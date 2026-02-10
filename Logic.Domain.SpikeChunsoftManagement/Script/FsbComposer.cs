@@ -7,6 +7,8 @@ namespace Logic.Domain.SpikeChunsoftManagement.Script;
 
 internal class FsbComposer : IFsbComposer
 {
+    private static readonly Cp932Comparer Cp932Comparer = new();
+
     public Sir0ScriptData Compose(Sir0Script script)
     {
         var result = new List<Sir0FunctionData>();
@@ -26,7 +28,7 @@ internal class FsbComposer : IFsbComposer
             Functions = [.. result],
             Strings = texts,
             ExportedLabels = script.ExportedLabels,
-            Texts3 = script.Texts3
+            GlobalVariables = script.GlobalVariables
         };
     }
 
@@ -233,7 +235,7 @@ internal class FsbComposer : IFsbComposer
         }
 
         string[] result = [.. texts];
-        Array.Sort(result, new Cp932Comparer());
+        Array.Sort(result, Cp932Comparer);
 
         return result;
     }

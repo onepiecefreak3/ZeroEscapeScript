@@ -20,8 +20,19 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     {
         ComposeNameDeclaration(codeUnit.NameDeclaration, sb);
 
-        foreach (MethodDeclarationSyntax methodDeclaration in codeUnit.MethodDeclarations)
-            ComposeMethodDeclaration(methodDeclaration, sb);
+        foreach (DeclarationSyntax member in codeUnit.Members)
+        {
+            switch (member)
+            {
+                case MethodDeclarationSyntax methodDeclaration:
+                    ComposeMethodDeclaration(methodDeclaration, sb);
+                    break;
+
+                case GlobalVariableDeclarationSyntax globalVariable:
+                    ComposeGlobalVariableDeclaration(globalVariable, sb);
+                    break;
+            }
+        }
     }
 
     private void ComposeNameDeclaration(NameDeclarationSyntax nameDeclaration, StringBuilder sb)
@@ -29,6 +40,13 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
         ComposeSyntaxToken(nameDeclaration.NameToken, sb);
         ComposeLiteralExpression(nameDeclaration.Name, sb);
         ComposeSyntaxToken(nameDeclaration.Semicolon, sb);
+    }
+
+    private void ComposeGlobalVariableDeclaration(GlobalVariableDeclarationSyntax globalVariable, StringBuilder sb)
+    {
+        ComposeSyntaxToken(globalVariable.Global, sb);
+        ComposeSyntaxToken(globalVariable.Identifier, sb);
+        ComposeSyntaxToken(globalVariable.Semicolon, sb);
     }
 
     private void ComposeMethodDeclaration(MethodDeclarationSyntax methodDeclaration, StringBuilder sb)

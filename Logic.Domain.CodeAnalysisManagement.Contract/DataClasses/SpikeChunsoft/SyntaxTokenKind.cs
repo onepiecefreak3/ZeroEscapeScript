@@ -64,6 +64,7 @@ public enum SyntaxTokenKind
     ContinueKeyword,
     ExportKeyword,
     NameKeyword,
+    GlobalKeyword,
 
     EndOfFile
 }

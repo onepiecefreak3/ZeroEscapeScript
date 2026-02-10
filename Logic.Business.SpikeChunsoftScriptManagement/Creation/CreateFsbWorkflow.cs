@@ -13,7 +13,7 @@ class CreateFsbWorkflow(
     IFsbWriter scriptWriter)
     : ICreateFsbWorkflow
 {
-    public void Create(Stream input, Stream output, Sir0Script donorScript)
+    public void Create(Stream input, Stream output)
     {
         // Read readable script
         using StreamReader streamReader = new(input);
@@ -21,16 +21,10 @@ class CreateFsbWorkflow(
         string readableScript = streamReader.ReadToEnd();
 
         // Convert to script data
-        var exportedLabels = new HashSet<string>();
-
         CodeUnitSyntax codeUnit = scriptParser.ParseCodeUnit(readableScript);
-        Sir0Function[] functions = treeConverter.CreateScriptFile(codeUnit, exportedLabels, out string name);
-
-        donorScript.Name = name;
-        donorScript.Functions = functions;
-        donorScript.ExportedLabels = [.. exportedLabels];
+        Sir0Script script = treeConverter.CreateScriptFile(codeUnit);
 
         // Write script data
-        scriptWriter.Write(donorScript, output);
+        scriptWriter.Write(script, output);
     }
 }

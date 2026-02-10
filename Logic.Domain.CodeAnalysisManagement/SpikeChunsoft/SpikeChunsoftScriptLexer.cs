@@ -542,7 +542,10 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
 
             case "name":
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.NameKeyword, position, line, column, finalValue);
-                
+
+            case "global":
+                return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.GlobalKeyword, position, line, column, finalValue);
+
             default:
                 return new SpikeChunsoftSyntaxToken(SyntaxTokenKind.Identifier, position, line, column, finalValue);
         }

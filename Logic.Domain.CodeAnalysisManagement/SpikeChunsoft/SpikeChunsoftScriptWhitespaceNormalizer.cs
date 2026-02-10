@@ -19,11 +19,24 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
     {
         NormalizeNameDeclaration(codeUnit.NameDeclaration, ctx);
 
-        foreach (MethodDeclarationSyntax methodDeclaration in codeUnit.MethodDeclarations)
+        for (var i = 0; i < codeUnit.Members.Count; i++)
         {
-            ctx.IsFirstElement = codeUnit.MethodDeclarations[0] == methodDeclaration;
-            ctx.ShouldLineBreak = codeUnit.MethodDeclarations[^1] != methodDeclaration;
-            NormalizeMethodDeclaration(methodDeclaration, ctx);
+            DeclarationSyntax member = codeUnit.Members[i];
+
+            ctx.IsFirstElement = codeUnit.Members[0] == member;
+            ctx.ShouldLineBreak = codeUnit.Members[^1] != member;
+
+            switch (member)
+            {
+                case GlobalVariableDeclarationSyntax globalVariable:
+                    var isNextGlobal = i + 1 < codeUnit.Members.Count && codeUnit.Members[i + 1] is GlobalVariableDeclarationSyntax;
+                    NormalizeGlobalVariableDeclaration(globalVariable, isNextGlobal);
+                    break;
+
+                case MethodDeclarationSyntax methodDeclaration:
+                    NormalizeMethodDeclaration(methodDeclaration, ctx);
+                    break;
+            }
         }
     }
 
@@ -39,6 +52,19 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
 
         nameDeclaration.SetNameToken(nameKeyword, false);
         nameDeclaration.SetSemicolon(newSemicolon, false);
+    }
+
+    private void NormalizeGlobalVariableDeclaration(GlobalVariableDeclarationSyntax globalVariable, bool isNextGlobal)
+    {
+        SyntaxToken globalKeyword = globalVariable.Global.WithLeadingTrivia(null).WithTrailingTrivia(" ");
+        SyntaxToken identifier = globalVariable.Identifier.WithNoTrivia();
+        SyntaxToken newSemicolon = globalVariable.Semicolon.WithLeadingTrivia(null);
+
+        newSemicolon = newSemicolon.WithTrailingTrivia(isNextGlobal ? "\r\n" : "\r\n\r\n");
+
+        globalVariable.SetGlobal(globalKeyword, false);
+        globalVariable.SetIdentifier(identifier, false);
+        globalVariable.SetSemicolon(newSemicolon, false);
     }
 
     private void NormalizeMethodDeclaration(MethodDeclarationSyntax methodDeclaration, WhitespaceNormalizeContext ctx)

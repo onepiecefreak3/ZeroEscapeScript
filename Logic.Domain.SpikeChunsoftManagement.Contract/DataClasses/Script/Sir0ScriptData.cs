@@ -6,5 +6,5 @@ public class Sir0ScriptData
     public required Sir0FunctionData[] Functions { get; set; }
     public required string[] Strings { get; set; }
     public required string[] ExportedLabels { get; set; }
-    public required string[] Texts3 { get; set; }
+    public required string[] GlobalVariables { get; set; }
 }

@@ -24,7 +24,7 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
 
         int text1Offset = WriteStrings(writer, data.Strings);
         int text2Offset = WriteStrings(writer, data.ExportedLabels);
-        int text3Offset = WriteStrings(writer, data.Texts3);
+        int text3Offset = WriteStrings(writer, data.GlobalVariables);
 
         int functionOffset = WriteFunctionEntries(writer, data.Functions, functionOffsets);
 
@@ -146,13 +146,13 @@ internal class FsbWriter(IFsbComposer scriptComposer) : IFsbWriter
             lastOffset = text2Offset + data.ExportedLabels.Length * 4 - 4;
         }
 
-        if (data.Texts3.Length > 0)
+        if (data.GlobalVariables.Length > 0)
         {
             WriteVariableInt(writer, text3Offset - lastOffset);
-            for (var i = 0; i < data.Texts3.Length - 1; i++)
+            for (var i = 0; i < data.GlobalVariables.Length - 1; i++)
                 writer.Write((byte)4);
 
-            lastOffset = text3Offset + data.Texts3.Length * 4 - 4;
+            lastOffset = text3Offset + data.GlobalVariables.Length * 4 - 4;
         }
 
         if (data.Functions.Length > 0)
