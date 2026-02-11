@@ -38,7 +38,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         var variables = new List<string>();
 
         foreach (GlobalVariableDeclarationSyntax member in members.Where(m => m is GlobalVariableDeclarationSyntax).Cast<GlobalVariableDeclarationSyntax>())
-            variables.Add(member.Identifier.Text);
+            variables.Add(GetStringLiteral(member.Identifier));
 
         return [.. variables];
     }
@@ -539,6 +539,10 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         {
             case LiteralExpressionSyntax literal:
                 AddLiteralExpression(operations, literal, jumpLabel);
+                break;
+
+            case SimpleMemberAccessExpressionSyntax memberAccess:
+                AddSimpleMemberAccessExpression(operations, memberAccess, jumpLabel);
                 break;
 
             case QualifiedMemberAccessExpressionSyntax memberAccess:

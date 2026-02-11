@@ -456,6 +456,7 @@ internal class SpikeChunsoftScriptLexer : ILexer<SpikeChunsoftSyntaxToken>
                 case 'Y':
                 case 'Z':
                 case '_':
+                case '.':
                     firstChar = false;
 
                     _sb.Append(ReadChar());

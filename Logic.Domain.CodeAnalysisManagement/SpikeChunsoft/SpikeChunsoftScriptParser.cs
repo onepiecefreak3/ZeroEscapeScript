@@ -82,7 +82,7 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
     private GlobalVariableDeclarationSyntax ParseGlobalVariableDeclaration(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
         var global = ParseGlobalKeyword(buffer);
-        var identifier = ParseIdentifierToken(buffer);
+        var identifier = ParseStringLiteralExpression(buffer);
         var semicolon = ParseSemicolonToken(buffer);
 
         return new GlobalVariableDeclarationSyntax(global, identifier, semicolon);
@@ -175,9 +175,6 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private StatementSyntax ParseStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        if (IsPostfixStatement(buffer))
-            return ParsePostfixStatement(buffer);
-
         if (IsExportedGotoLabelStatement(buffer))
             return ParseExportedGotoLabelStatement(buffer);
 
@@ -187,6 +184,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         if (HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) || HasTokenKind(buffer, SyntaxTokenKind.ParenOpen))
         {
             var left = ParseAtomicExpression(buffer);
+
+            if (IsPostfixStatement(buffer))
+                return ParsePostfixStatement(buffer, left);
 
             if (IsAssignmentStatement(buffer))
                 return ParseAssignmentStatement(buffer, left);
@@ -245,9 +245,8 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
 
     private bool IsPostfixStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
     {
-        return HasTokenKind(buffer, SyntaxTokenKind.StringLiteral) &&
-               (HasTokenKind(buffer, 1, SyntaxTokenKind.PlusPlus) ||
-                HasTokenKind(buffer, 1, SyntaxTokenKind.MinusMinus));
+        return HasTokenKind(buffer, SyntaxTokenKind.PlusPlus) ||
+                HasTokenKind(buffer, SyntaxTokenKind.MinusMinus);
     }
 
     private bool IsExportedGotoLabelStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
@@ -278,10 +277,9 @@ internal class SpikeChunsoftScriptParser : ISpikeChunsoftScriptParser
         return new NativeMethodInvocationStatementSyntax(left, semicolon);
     }
 
-    private PostfixStatementSyntax ParsePostfixStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer)
+    private PostfixStatementSyntax ParsePostfixStatement(IBuffer<SpikeChunsoftSyntaxToken> buffer, ExpressionSyntax left)
     {
-        var literal = ParseLiteralExpression(buffer);
-        var postfix = ParsePostfixExpression(buffer, literal);
+        var postfix = ParsePostfixExpression(buffer, left);
         SyntaxToken semicolon = ParseSemicolonToken(buffer);
 
         return new PostfixStatementSyntax(postfix, semicolon);

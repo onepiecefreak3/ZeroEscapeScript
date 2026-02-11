@@ -45,7 +45,7 @@ internal class SpikeChunsoftScriptComposer(ISpikeChunsoftSyntaxFactory syntaxFac
     private void ComposeGlobalVariableDeclaration(GlobalVariableDeclarationSyntax globalVariable, StringBuilder sb)
     {
         ComposeSyntaxToken(globalVariable.Global, sb);
-        ComposeSyntaxToken(globalVariable.Identifier, sb);
+        ComposeLiteralExpression(globalVariable.Identifier, sb);
         ComposeSyntaxToken(globalVariable.Semicolon, sb);
     }
 

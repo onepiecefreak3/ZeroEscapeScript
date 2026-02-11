@@ -30,7 +30,7 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
             {
                 case GlobalVariableDeclarationSyntax globalVariable:
                     var isNextGlobal = i + 1 < codeUnit.Members.Count && codeUnit.Members[i + 1] is GlobalVariableDeclarationSyntax;
-                    NormalizeGlobalVariableDeclaration(globalVariable, isNextGlobal);
+                    NormalizeGlobalVariableDeclaration(globalVariable, isNextGlobal, ctx);
                     break;
 
                 case MethodDeclarationSyntax methodDeclaration:
@@ -54,16 +54,19 @@ internal class SpikeChunsoftScriptWhitespaceNormalizer : ISpikeChunsoftScriptWhi
         nameDeclaration.SetSemicolon(newSemicolon, false);
     }
 
-    private void NormalizeGlobalVariableDeclaration(GlobalVariableDeclarationSyntax globalVariable, bool isNextGlobal)
+    private void NormalizeGlobalVariableDeclaration(GlobalVariableDeclarationSyntax globalVariable, bool isNextGlobal, WhitespaceNormalizeContext ctx)
     {
         SyntaxToken globalKeyword = globalVariable.Global.WithLeadingTrivia(null).WithTrailingTrivia(" ");
-        SyntaxToken identifier = globalVariable.Identifier.WithNoTrivia();
         SyntaxToken newSemicolon = globalVariable.Semicolon.WithLeadingTrivia(null);
 
         newSemicolon = newSemicolon.WithTrailingTrivia(isNextGlobal ? "\r\n" : "\r\n\r\n");
 
+        ctx.ShouldIndent = false;
+        ctx.IsFirstElement = true;
+        ctx.ShouldLineBreak = false;
+        NormalizeLiteralExpression(globalVariable.Identifier,ctx);
+
         globalVariable.SetGlobal(globalKeyword, false);
-        globalVariable.SetIdentifier(identifier, false);
         globalVariable.SetSemicolon(newSemicolon, false);
     }
 

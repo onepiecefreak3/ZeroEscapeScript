@@ -100,7 +100,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
     private GlobalVariableDeclarationSyntax CreateGlobalVariableDeclaration(string variableName)
     {
         SyntaxToken global = _syntaxFactory.Token(SyntaxTokenKind.GlobalKeyword);
-        SyntaxToken identifier = _syntaxFactory.Identifier(variableName);
+        LiteralExpressionSyntax identifier = CreateStringLiteralExpression(variableName);
         SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new GlobalVariableDeclarationSyntax(global, identifier, semicolon);
@@ -257,7 +257,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
                 if (operation.Arguments[0] is not "?_eval_")
                 {
-                    expression = CreateQualifiedMemberAccessExpression((string)operation.Arguments[0], (string)operation.Arguments[1]);
+                    expression = CreateStringLiteralExpression((string)operation.Arguments[0] + "::" + (string)operation.Arguments[1]);
                     break;
                 }
 
@@ -501,7 +501,7 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         ExpressionSyntax index = syntax.Pop();
         ExpressionSyntax expression = syntax.Pop();
 
-        if (expression is not MethodInvocationExpressionSyntax and not LiteralExpressionSyntax)
+        if (expression is not MethodInvocationExpressionSyntax and not LiteralExpressionSyntax and not ArrayIndexExpressionSyntax)
             expression = CreateParenthesizedExpression(expression);
 
         return new ArrayIndexExpressionSyntax(expression, [CreateArrayIndexerExpression(index)]);
@@ -555,7 +555,17 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         ExpressionSyntax nameExpression = syntax.Pop();
 
         if (nameExpression is LiteralExpressionSyntax { Literal.RawKind: (int)SyntaxTokenKind.StringLiteral } literal)
-            nameExpression = CreateSimpleMemberAccessExpression(literal.Literal.Text[1..^1]);
+        {
+            var texts = literal.Literal.Text[1..^1].Split("::");
+
+            if (texts[0][0] is '?')
+                texts[0] = texts[0][1..];
+
+            if (texts.Length > 1)
+                nameExpression = CreateQualifiedMemberAccessExpression(texts[0], texts[1]);
+            else
+                nameExpression = CreateSimpleMemberAccessExpression(texts[0]);
+        }
 
         if (nameExpression is not MemberAccessExpressionSyntax)
             throw new InvalidOperationException("Need method name for invocation.");
@@ -581,9 +591,6 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
     private QualifiedMemberAccessExpressionSyntax CreateQualifiedMemberAccessExpression(string nameSpace, string name)
     {
-        if (nameSpace[0] is '?')
-            nameSpace = nameSpace[1..];
-
         SyntaxToken nameSpaceIdentifier = _syntaxFactory.Identifier(nameSpace);
         SyntaxToken operatorToken = _syntaxFactory.Token(SyntaxTokenKind.ColonColon);
         SyntaxToken identifier = _syntaxFactory.Identifier(name);
