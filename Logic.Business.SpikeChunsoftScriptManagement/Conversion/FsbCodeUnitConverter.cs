@@ -119,6 +119,12 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
                     break;
 
                 case NativeMethodInvocationStatementSyntax methodInvocation:
+                    if (IsBuiltInNativeMethodInvocation(methodInvocation.Method))
+                    {
+                        AddBuiltInNativeMethodInvocation(operations, methodInvocation.Method, jumpLabel);
+                        break;
+                    }
+
                     AddOperations(operations, methodInvocation, jumpLabel);
                     break;
 
@@ -221,6 +227,42 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         }
 
         operations.Add(new Sir0Operation(jumpLabel, operation, arguments));
+    }
+
+    private bool IsBuiltInNativeMethodInvocation(NativeMethodInvocationExpressionSyntax expression)
+    {
+        return expression.Name is SimpleMemberAccessExpressionSyntax memberAccess &&
+               (memberAccess.Identifier.Text.Equals("setSpeaker", StringComparison.OrdinalIgnoreCase) ||
+                memberAccess.Identifier.Text.Equals("setText", StringComparison.OrdinalIgnoreCase) ||
+                memberAccess.Identifier.Text.Equals("setCheckpoint", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void AddBuiltInNativeMethodInvocation(List<Sir0Operation> operations, NativeMethodInvocationExpressionSyntax expression, string? jumpLabel)
+    {
+        if (expression.Name is not SimpleMemberAccessExpressionSyntax memberAccess)
+            return;
+
+        var arguments = new List<object>();
+        foreach (ExpressionSyntax parameter in expression.Parameters.ParameterList?.Elements ?? [])
+        {
+            if (parameter is LiteralExpressionSyntax literal)
+                arguments.Add(GetArgument(literal));
+        }
+
+        switch (memberAccess.Identifier.Text)
+        {
+            case "setSpeaker":
+                AddOperation(operations, 0x28, [.. arguments], jumpLabel);
+                return;
+
+            case "setText":
+                AddOperation(operations, 0x2F, [.. arguments], jumpLabel);
+                break;
+
+            case "setCheckpoint":
+                AddOperation(operations, 0x32, [.. arguments], jumpLabel);
+                break;
+        }
     }
 
     private void AddOperations(List<Sir0Operation> operations, NativeMethodInvocationStatementSyntax methodInvocation, string? jumpLabel)
@@ -767,6 +809,7 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
         {
             bool endsWithBreak = @case.Statements.Count > 0 && @case.Statements[^1] is BreakStatementSyntax;
             string? danglingLabel = CreateOperationsInternal(operations, @case.Statements, exportedLabels, label);
+            
             if (!endsWithBreak)
                 AddUnconditionalJump(operations, danglingLabel, endLabel);
         }
@@ -936,7 +979,12 @@ internal class FsbCodeUnitConverter(ISpikeChunsoftSyntaxFactory syntaxFactory) :
 
     private static void AddOperation(List<Sir0Operation> operations, byte operation, string? jumpLabel = null)
     {
-        operations.Add(new Sir0Operation(jumpLabel, operation, []));
+        AddOperation(operations, operation, [], jumpLabel);
+    }
+
+    private static void AddOperation(List<Sir0Operation> operations, byte operation, object[] arguments, string? jumpLabel = null)
+    {
+        operations.Add(new Sir0Operation(jumpLabel, operation, arguments));
     }
 
     private static void AddAsyncStartOperation(List<Sir0Operation> operations, string? jumpLabel)

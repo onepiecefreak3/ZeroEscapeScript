@@ -169,6 +169,11 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
 
                     throw new InvalidOperationException("Could not create statement from expression.");
 
+                case 0x28:
+                case 0x2F:
+                case 0x32:
+                    return CreateBuiltInNativeMethodInvocation(operation);
+
                 case 0x2B:
                     return CreateAsyncBlockStatement(operations, ref index, exportedLabels);
 
@@ -570,7 +575,14 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         if (nameExpression is not MemberAccessExpressionSyntax)
             throw new InvalidOperationException("Need method name for invocation.");
 
-        return new NativeMethodInvocationExpressionSyntax(nameExpression, CreateNativeMethodInvocationParameters([.. args.Reverse()]));
+        return CreateNativeMethodInvocationExpression(nameExpression, [.. args.Reverse()]);
+    }
+
+    private NativeMethodInvocationExpressionSyntax CreateNativeMethodInvocationExpression(ExpressionSyntax name, ExpressionSyntax[] args)
+    {
+        var parameters = CreateNativeMethodInvocationParameters(args);
+
+        return new NativeMethodInvocationExpressionSyntax(name, parameters);
     }
 
     private SimpleMemberAccessExpressionSyntax CreateSimpleMemberAccessExpression(string name)
@@ -679,6 +691,38 @@ internal class FsbScriptFileConverter : IFsbScriptFileConverter
         SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
 
         return new MethodInvocationStatementSyntax(method, semicolon);
+    }
+
+    private NativeMethodInvocationStatementSyntax CreateBuiltInNativeMethodInvocation(Sir0Operation operation)
+    {
+        ExpressionSyntax name;
+        ExpressionSyntax[] parameters;
+
+        switch (operation.Command)
+        {
+            case 0x28:
+                name = CreateSimpleMemberAccessExpression("setSpeaker");
+                parameters = [CreateStringLiteralExpression((string)operation.Arguments[0])];
+                break;
+
+            case 0x2F:
+                name = CreateSimpleMemberAccessExpression("setText");
+                parameters = [CreateStringLiteralExpression((string)operation.Arguments[0])];
+                break;
+
+            case 0x32:
+                name = CreateSimpleMemberAccessExpression("setCheckpoint");
+                parameters = [CreateNumericLiteralExpression((int)operation.Arguments[0])];
+                break;
+
+            default:
+                throw new InvalidOperationException("Unknown built-in operation.");
+        }
+
+        var methodInvocation = CreateNativeMethodInvocationExpression(name, parameters);
+        SyntaxToken semicolon = _syntaxFactory.Token(SyntaxTokenKind.Semicolon);
+
+        return new NativeMethodInvocationStatementSyntax(methodInvocation, semicolon);
     }
 
     private NativeMethodInvocationStatementSyntax CreateNativeMethodInvocationStatement(NativeMethodInvocationExpressionSyntax methodInvocation)
