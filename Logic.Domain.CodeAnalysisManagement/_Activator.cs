@@ -41,6 +41,8 @@ public class CodeAnalysisActivator : IComponentActivator
 
         kernel.Register<ISpikeChunsoftSyntaxFactory, SpikeChunsoftSyntaxFactory>();
 
+        kernel.Register<ITreeWalker, SpikeChunsoftTreeWalker>(ActivationScope.Unique);
+
         kernel.RegisterConfiguration<CodeAnalysisConfiguration>();
     }
 
